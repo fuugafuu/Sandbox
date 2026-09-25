@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <meta name="theme-color" content="#1a1a1a" />
   <title>Sandbox</title>
-  <link rel="stylesheet" href="./styles.css?v=5" />
+  <link rel="stylesheet" href="./styles.css?v=6" />
 </head>
 <body>
   <main id="app">
@@ -29,7 +29,6 @@
       <div class="palette-title">SPAWN</div>
       <button data-spawn="dummy" data-label="Dummy"><b>人</b><span>Living</span></button>
       <button data-spawn="thanos" data-label="Thanos"><b>Θ</b><span>Thanos</span></button>
-      <button data-spawn="mark42" data-label="Mark 42"><b>42</b><span>Mark 42</span></button>
       <button data-spawn="crate" data-label="Crate"><b>□</b><span>Crate</span></button>
       <button data-spawn="concrete" data-label="Concrete"><b>▣</b><span>Concrete</span></button>
       <button data-spawn="barrel" data-label="Explosive"><b>!</b><span>Explosive</span></button>
@@ -47,6 +46,7 @@
       <div class="stat hp"><span id="healthLabel">HEALTH</span><div class="track"><i id="healthBar"></i></div><b id="healthText">100</b></div>
       <div class="stat nano"><span id="nanoLabel">NANO RESERVE</span><div class="track"><i id="nanoBar"></i></div><b id="nanoText">100</b></div>
       <div class="stat power"><span id="energyLabel">POWER</span><div class="track"><i id="energyBar"></i></div><b id="energyText">100</b></div>
+      <button id="changeSuitBtn">CHANGE SUIT</button>
     </aside>
 
     <section id="weaponPanel" class="panel">
@@ -82,9 +82,27 @@
     </section>
 
     <div id="toast"></div>
+
+    <section id="suitPicker" class="suit-picker open" aria-label="Choose Iron Man suit">
+      <div class="suit-picker-card">
+        <div class="picker-eyebrow">TONY STARK / ARMOR LOADOUT</div>
+        <h1>CHOOSE SUIT</h1>
+        <p>選んだスーツだけをSUITボタンで着脱します。</p>
+        <div class="suit-options">
+          <button data-suit-choice="mark50">
+            <span class="suit-no">50</span>
+            <span><strong>MARK 50</strong><small>NANOTECH · INFINITY WAR</small></span>
+          </button>
+          <button data-suit-choice="mark42">
+            <span class="suit-no">42</span>
+            <span><strong>MARK 42</strong><small>AUTONOMOUS PARTS · IRON MAN 3</small></span>
+          </button>
+        </div>
+      </div>
+    </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
-  <script src="./game.js?v=5"></script>
+  <script src="./game.js?v=6"></script>
 </body>
 </html>
