@@ -47,6 +47,7 @@ const effects = [];
 const debris = [];
 const missiles = [];
 const thanoses = [];
+const mark42Pieces = [];
 const explosiveBodies = new Set();
 let selectedActor = null;
 const weaponNames = ['REPULSOR','UNIBEAM','NANO BLADE','NANO SHIELD','BATTERING RAM','CLUSTER CANNON','MICRO-MISSILES'];
@@ -264,6 +265,7 @@ function createTony(x,y){
   const actor={
     type:'tony', health:100, nano:100, energy:100, coverage:0, suitWanted:false,
     flight:false, alive:true, facing:1, fireCooldown:0, jumpCooldown:0, shieldBody:null,
+    armorModel:'mark50', mark42State:'idle', mark42Count:0, mark42Total:24, mark42Attached:{}, mark42Required:{},
     weaponMorph:0, stun:0, grounded:false, repairDelay:0, armor:{}, armorMax:{}, bodyHp:{}, parts:{}, bodies:[], joints:[]
   };
   const add=(name,body,maxHp,armorMax)=>{
@@ -312,8 +314,124 @@ const armorStart={
   thighL:.31,thighR:.34,calfL:.44,calfR:.47,footL:.53,footR:.55,head:.69
 };
 function armorPresence(name){
+  if(tony.armorModel==='mark42'){
+    const need=tony.mark42Required?.[name]||1;
+    return clamp((tony.mark42Attached?.[name]||0)/need,0,1);
+  }
   const start=armorStart[name] ?? .2;
   return smoothstep(start,Math.min(1,start+.24),tony.coverage);
+}
+
+const MARK42_LAYOUT=[
+  ['torso',[-18,-18]],['torso',[18,-18]],['torso',[-16,20]],['torso',[16,20]],
+  ['head',[-8,-4]],['head',[8,4]],
+  ['pelvis',[-12,0]],['pelvis',[12,0]],
+  ['upperArmL',[0,-12]],['upperArmL',[0,14]],['upperArmR',[0,-12]],['upperArmR',[0,14]],
+  ['forearmL',[0,-12]],['forearmL',[0,14]],['forearmR',[0,-12]],['forearmR',[0,14]],
+  ['thighL',[0,-14]],['thighL',[0,18]],['thighR',[0,-14]],['thighR',[0,18]],
+  ['calfL',[0,2]],['calfR',[0,2]],['footL',[0,0]],['footR',[0,0]]
+].map(([part,o])=>[part,{x:o[0],y:o[1]}]);
+
+function setArmorPools(model){
+  const max42={head:190,torso:330,pelvis:240,upperArmL:175,upperArmR:175,forearmL:185,forearmR:185,thighL:220,thighR:220,calfL:190,calfR:190,footL:130,footR:130};
+  const max50={head:340,torso:620,pelvis:430,upperArmL:300,upperArmR:300,forearmL:320,forearmR:320,thighL:390,thighR:390,calfL:340,calfR:340,footL:230,footR:230};
+  const src=model==='mark42'?max42:max50;
+  for(const name of Object.keys(tony.armorMax)){
+    tony.armorMax[name]=src[name]||tony.armorMax[name];
+    tony.armor[name]=tony.armorMax[name];
+  }
+}
+function clearMark42Pieces(){
+  for(const p of mark42Pieces){
+    if(Composite.get(world,p.body.id,'body')) Composite.remove(world,p.body);
+  }
+  mark42Pieces.length=0;
+}
+function summonMark42(){
+  clearMark42Pieces();
+  if(tony.shieldBody){Composite.remove(world,tony.shieldBody);tony.shieldBody=null;}
+  tony.flight=false;
+  tony.suitWanted=false;
+  tony.armorModel='mark42';
+  tony.mark42State='assembling';
+  tony.mark42Count=0;
+  tony.mark42Attached={};
+  tony.mark42Required={};
+  tony.coverage=0;
+  setArmorPools('mark42');
+
+  for(const [part] of MARK42_LAYOUT) tony.mark42Required[part]=(tony.mark42Required[part]||0)+1;
+
+  const base=tony.parts.torso.position;
+  MARK42_LAYOUT.forEach(([part,offset],i)=>{
+    const side=i%2===0?-1:1;
+    const ring=Math.floor(i/2);
+    const px=base.x+side*(170+(ring%6)*34)+rand(-18,18);
+    const py=Math.min(FLOOR_Y-54,base.y+115+(ring%3)*24+rand(-8,8));
+    const dims=armorDims(part);
+    const w=clamp(dims.w*.45,10,24),h=clamp(dims.h*.24,8,22);
+    const body=Bodies.rectangle(px,py,w,h,{density:.0032,friction:.7,restitution:.08,chamfer:{radius:2},angle:rand(-1.2,1.2)});
+    tag(body,{kind:'mark42piece',owner:tony,partName:part,pieceIndex:i});
+    Composite.add(world,body);
+    mark42Pieces.push({body,part,offset,delay:.12+i*.055,active:false,attached:false});
+  });
+  selectedActor=tony;
+  toast('MARK 42 COMPONENTS ONLINE');
+}
+function updateMark42Pieces(dt){
+  if(tony.armorModel!=='mark42') return;
+  for(let i=mark42Pieces.length-1;i>=0;i--){
+    const p=mark42Pieces[i];
+    if(!Composite.get(world,p.body.id,'body')){mark42Pieces.splice(i,1);continue;}
+    p.delay-=dt;
+    if(p.delay>0) continue;
+    if(!p.active){p.active=true;p.body.collisionFilter.mask=0;}
+
+    const targetBody=tony.parts[p.part];
+    const target=localToWorld(targetBody,p.offset);
+    const dx=target.x-p.body.position.x,dy=target.y-p.body.position.y;
+    const d=Math.hypot(dx,dy)||1;
+    const desired=clamp(d*.055,4,17);
+    const desiredV={x:dx/d*desired+targetBody.velocity.x,y:dy/d*desired+targetBody.velocity.y};
+    Body.setVelocity(p.body,{
+      x:lerp(p.body.velocity.x,desiredV.x,.15),
+      y:lerp(p.body.velocity.y,desiredV.y,.15)
+    });
+    const targetAngle=targetBody.angle+(i%2?-.08:.08);
+    Body.setAngularVelocity(p.body,p.body.angularVelocity+shortestAngle(targetAngle,p.body.angle)*.08-p.body.angularVelocity*.06);
+
+    effects.push({kind:'pieceThruster',x:p.body.position.x-dx/d*7,y:p.body.position.y-dy/d*7,vx:-dx/d*.8+rand(-.15,.15),vy:-dy/d*.8+rand(-.15,.15),life:.12,maxLife:.12,size:1.8});
+
+    if(d<15){
+      Composite.remove(world,p.body);
+      tony.mark42Attached[p.part]=(tony.mark42Attached[p.part]||0)+1;
+      tony.mark42Count++;
+      tony.coverage=tony.mark42Count/tony.mark42Total;
+      spark(target,3,true);
+      mark42Pieces.splice(i,1);
+    }
+  }
+  if(tony.mark42State==='assembling'&&tony.mark42Count>=tony.mark42Total){
+    tony.mark42State='assembled';
+    tony.coverage=1;
+    toast('MARK 42 CONNECTED');
+  }
+}
+function releaseMark42(){
+  if(tony.armorModel!=='mark42') return;
+  clearMark42Pieces();
+  let index=0;
+  for(const [part,offset] of MARK42_LAYOUT){
+    const tb=tony.parts[part],start=localToWorld(tb,offset);
+    const dims=armorDims(part);
+    const body=Bodies.rectangle(start.x,start.y,clamp(dims.w*.45,10,24),clamp(dims.h*.24,8,22),{density:.0032,friction:.7,restitution:.12,angle:tb.angle});
+    tag(body,{kind:'mark42piece',owner:null,partName:part,pieceIndex:index++});
+    Body.setVelocity(body,{x:tb.velocity.x+rand(-5,5),y:tb.velocity.y+rand(-5,-1)});
+    Composite.add(world,body);
+  }
+  tony.mark42State='idle';tony.mark42Count=0;tony.mark42Attached={};tony.coverage=0;
+  tony.armorModel='none';tony.flight=false;
+  toast('MARK 42 RELEASED');
 }
 
 function clearDynamic(){
@@ -328,7 +446,7 @@ function clearDynamic(){
 }
 function resetScene(){
   Composite.clear(world,false,true);
-  effects.length=0; debris.length=0; missiles.length=0; thanoses.length=0; explosiveBodies.clear();
+  effects.length=0; debris.length=0; missiles.length=0; thanoses.length=0; mark42Pieces.length=0; explosiveBodies.clear();
   sceneSeed=1;
   createEnvironment();
   spawnCrate(1200,540); spawnCrate(1276,540);
@@ -362,17 +480,18 @@ function damageBody(body,amount,point,source='impact'){
   if(p.kind==='tony'){
     const name=p.partName;
     const presence=armorPresence(name);
+    const is42=tony.armorModel==='mark42';
     let incoming=amount;
 
     // Movie-style Mark 50 behavior: the rigid nano shell takes most of the hit.
     // Ordinary falls/prop bumps should scuff it, not shred it.
-    const armorCostScale={
+    const armorCostScale=({
       impact:.30,
       explosion:.52,
       energy:.70,
       blade:.78,
       ram:.92
-    }[source] ?? .48;
+    }[source] ?? .48)*(is42?1.48:1);
 
     if(tony.coverage>.60 && presence>.55 && tony.armor[name]>0){
       const armorCost=incoming*armorCostScale;
@@ -589,6 +708,7 @@ function spawnMissile(pos,dir,spread){
 
 function repairArmor(dt){
   tony.repairDelay=Math.max(0,tony.repairDelay-dt);
+  if(tony.armorModel!=='mark50') return;
   if(tony.coverage<.92 || tony.nano<=0 || !tony.alive || tony.repairDelay>0) return;
   let repaired=false;
   for(const name of Object.keys(tony.armor)){
@@ -684,10 +804,16 @@ function activeRagdoll(dt){
 }
 function updateTony(dt){
   const torso=tony.parts.torso;
-  if(tony.suitWanted) tony.coverage=Math.min(1,tony.coverage+dt*1.28);
-  else tony.coverage=Math.max(0,tony.coverage-dt*1.38);
+  if(tony.armorModel==='mark50'){
+    if(tony.suitWanted) tony.coverage=Math.min(1,tony.coverage+dt*1.28);
+    else tony.coverage=Math.max(0,tony.coverage-dt*1.38);
+  } else if(tony.armorModel==='mark42'){
+    tony.coverage=tony.mark42Count/tony.mark42Total;
+  } else {
+    tony.coverage=0;
+  }
 
-  if(tony.coverage>0.15 && tony.coverage<.98 && Math.random()<.4){
+  if(tony.armorModel==='mark50'&&tony.coverage>0.15 && tony.coverage<.98 && Math.random()<.4){
     const names=Object.keys(tony.parts), name=names[(Math.random()*names.length)|0];
     const b=tony.parts[name];
     effects.push({kind:'nano',x:b.position.x+rand(-18,18),y:b.position.y+rand(-22,22),vx:rand(-1,1),vy:rand(-1,1),life:.25,maxLife:.25,size:rand(1,3)});
@@ -817,6 +943,7 @@ function update(dt){
   const scaled=dt*(slowMo?.28:1);
   Engine.update(engine,Math.min(33,scaled*1000));
   updateTony(scaled);
+  updateMark42Pieces(scaled);
   updateThanoses(scaled);
   updateMissiles(scaled);
   updateShield(scaled);
@@ -1036,7 +1163,48 @@ function drawArmorDamage(name,ratio,w,h){
   }
   ctx.restore();
 }
+function drawMark42Armor(body,name,presence){
+  if(presence<=.01 || tony.armor[name]<=.2) return;
+  const ratio=clamp(tony.armor[name]/tony.armorMax[name],0,1);
+  const {w,h}=armorDims(name);
+  ctx.save();ctx.translate(body.position.x,body.position.y);ctx.rotate(body.angle);ctx.globalAlpha=presence;
+  const gold=ctx.createLinearGradient(-w/2,-h/2,w/2,h/2);
+  gold.addColorStop(0,'#e6c37a');gold.addColorStop(.45,'#b88b3f');gold.addColorStop(1,'#6f4c20');
+  const red=ctx.createLinearGradient(0,-h/2,0,h/2);
+  red.addColorStop(0,'#b9473f');red.addColorStop(1,'#702423');
+  ctx.lineWidth=1.1;ctx.strokeStyle='rgba(246,221,170,.55)';
+
+  if(name==='head'){
+    ctx.fillStyle=red;ctx.beginPath();ctx.arc(0,0,25,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle=gold;ctx.beginPath();ctx.moveTo(-16,-15);ctx.lineTo(16,-15);ctx.lineTo(19,4);ctx.lineTo(10,18);ctx.lineTo(-10,18);ctx.lineTo(-19,4);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle=COLORS.cyan;ctx.shadowColor=COLORS.cyan;ctx.shadowBlur=8;ctx.fillRect(-12,-4,8,2.5);ctx.fillRect(4,-4,8,2.5);ctx.shadowBlur=0;
+  }else{
+    ctx.fillStyle=gold;ctx.beginPath();ctx.roundRect(-w/2,-h/2,w,h,Math.min(8,w/2));ctx.fill();ctx.stroke();
+    ctx.fillStyle='#2a2f31';ctx.fillRect(-w*.08,-h*.44,w*.16,h*.88);
+    if(name==='torso'){
+      ctx.fillStyle=red;
+      ctx.beginPath();ctx.moveTo(-w*.48,-h*.45);ctx.lineTo(-w*.12,-h*.28);ctx.lineTo(-w*.20,h*.15);ctx.lineTo(-w*.46,h*.32);ctx.closePath();ctx.fill();
+      ctx.beginPath();ctx.moveTo(w*.48,-h*.45);ctx.lineTo(w*.12,-h*.28);ctx.lineTo(w*.20,h*.15);ctx.lineTo(w*.46,h*.32);ctx.closePath();ctx.fill();
+      ctx.fillStyle=COLORS.cyan;ctx.shadowColor=COLORS.cyan;ctx.shadowBlur=13;ctx.beginPath();ctx.arc(0,-4,7.5,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+    }else if(name.includes('upperArm')||name.includes('forearm')){
+      ctx.fillStyle=red;ctx.beginPath();ctx.roundRect(-w*.44,-h*.38,w*.88,h*.28,3);ctx.fill();
+      if(name.includes('forearm')){ctx.fillStyle=gold;ctx.beginPath();ctx.roundRect(-w*.38,h*.05,w*.76,h*.30,3);ctx.fill();}
+    }else if(name.includes('thigh')||name.includes('calf')){
+      ctx.fillStyle=red;ctx.beginPath();ctx.roundRect(-w*.40,-h*.34,w*.80,h*.22,3);ctx.fill();
+    }else if(name.includes('foot')){
+      ctx.fillStyle=red;ctx.fillRect(-w*.40,-h*.30,w*.80,h*.45);
+    }else if(name==='pelvis'){
+      ctx.fillStyle=red;ctx.fillRect(-w*.42,-h*.30,w*.84,h*.30);
+    }
+    ctx.strokeStyle='rgba(35,31,26,.48)';ctx.lineWidth=.8;
+    ctx.beginPath();ctx.moveTo(-w*.35,-h*.08);ctx.lineTo(w*.28,h*.10);ctx.stroke();
+  }
+  drawArmorDamage('42'+name,ratio,w,h);
+  ctx.restore();
+}
 function drawArmor(body,name,presence){
+  if(tony.armorModel==='mark42'){drawMark42Armor(body,name,presence);return;}
+  if(tony.armorModel!=='mark50') return;
   if(presence<=.01 || tony.armor[name]<=.2) return;
   const ratio=clamp(tony.armor[name]/tony.armorMax[name],0,1);
   const {w,h}=armorDims(name);
@@ -1203,10 +1371,17 @@ function updateHUD(){
   }else{
     const hp=Math.round(tony.health), nano=Math.round(tony.nano), power=Math.round(tony.energy);
     ui.selectedName.textContent='TONY STARK';
-    ui.healthLabel.textContent='HEALTH';ui.nanoLabel.textContent='NANO RESERVE';ui.energyLabel.textContent='POWER';
-    ui.healthText.textContent=hp;ui.nanoText.textContent=nano;ui.energyText.textContent=power;
-    ui.healthBar.style.width=hp+'%';ui.nanoBar.style.width=nano+'%';ui.energyBar.style.width=power+'%';
-    ui.suitState.textContent=tony.coverage<.05?'CIVILIAN':tony.coverage>.96?'MARK 50':'NANOTECH '+Math.round(tony.coverage*100)+'%';
+    ui.healthLabel.textContent='HEALTH';ui.energyLabel.textContent='POWER';
+    ui.healthText.textContent=hp;ui.energyText.textContent=power;
+    ui.healthBar.style.width=hp+'%';ui.energyBar.style.width=power+'%';
+    if(tony.armorModel==='mark42'){
+      const assembly=Math.round(tony.coverage*100);
+      ui.nanoLabel.textContent='ASSEMBLY';ui.nanoText.textContent=assembly;ui.nanoBar.style.width=assembly+'%';
+      ui.suitState.textContent=tony.mark42State==='assembled'?'MARK 42':'MARK 42 / '+assembly+'%';
+    }else{
+      ui.nanoLabel.textContent='NANO RESERVE';ui.nanoText.textContent=nano;ui.nanoBar.style.width=nano+'%';
+      ui.suitState.textContent=tony.coverage<.05?'CIVILIAN':tony.coverage>.96?'MARK 50':'NANOTECH '+Math.round(tony.coverage*100)+'%';
+    }
   }
   ui.weaponState.textContent=weaponNames[weaponMode];
 }
@@ -1215,9 +1390,19 @@ function updateWeaponUI(){
   if(ui.weaponState) ui.weaponState.textContent=weaponNames[weaponMode];
 }
 function setWeapon(i){
-  weaponMode=(i+weaponNames.length)%weaponNames.length;updateWeaponUI();toast(weaponNames[weaponMode]);
+  let next=(i+weaponNames.length)%weaponNames.length;
+  if(tony.armorModel==='mark42'&&next>1) next=0;
+  weaponMode=next;updateWeaponUI();toast(weaponNames[weaponMode]);
 }
 function toggleSuit(){
+  if(tony.armorModel==='mark42'){
+    if(tony.mark42State==='assembled') releaseMark42();
+    else summonMark42();
+    return;
+  }
+  if(tony.armorModel==='none'){
+    tony.armorModel='mark50';setArmorPools('mark50');tony.nano=100;
+  }
   tony.suitWanted=!tony.suitWanted;
   if(!tony.suitWanted) tony.flight=false;
   toast(tony.suitWanted?'NANOTECH DEPLOY':'NANOTECH RETRACT');
@@ -1314,6 +1499,7 @@ document.querySelectorAll('[data-spawn]').forEach(btn=>btn.addEventListener('cli
   const k=btn.dataset.spawn;
   if(k==='dummy')createDummy(p.x,p.y);
   if(k==='thanos'){const a=createThanos(p.x,p.y-70);selectedActor=a;}
+  if(k==='mark42')summonMark42();
   if(k==='crate')spawnCrate(p.x,p.y);
   if(k==='concrete')spawnConcrete(p.x,p.y);
   if(k==='barrel')spawnBarrel(p.x,p.y);
@@ -1321,6 +1507,8 @@ document.querySelectorAll('[data-spawn]').forEach(btn=>btn.addEventListener('cli
   toast(k.toUpperCase()+' SPAWNED');
 }));
 document.getElementById('resetBtn').addEventListener('click',resetScene);
+document.getElementById('zoomInBtn').addEventListener('click',()=>{camera.zoom=clamp(camera.zoom*1.18,camera.minZoom,camera.maxZoom);});
+document.getElementById('zoomOutBtn').addEventListener('click',()=>{camera.zoom=clamp(camera.zoom/1.18,camera.minZoom,camera.maxZoom);});
 ui.pauseBtn.addEventListener('click',()=>{paused=!paused;toast(paused?'PAUSED':'RESUME');});
 ui.slowBtn.addEventListener('click',()=>{slowMo=!slowMo;toast(slowMo?'SLOW-MO':'NORMAL TIME');});
 document.querySelectorAll('[data-weapon]').forEach(btn=>btn.addEventListener('click',()=>setWeapon(Number(btn.dataset.weapon))));
