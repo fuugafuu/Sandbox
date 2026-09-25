@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <meta name="theme-color" content="#1a1a1a" />
   <title>Sandbox</title>
-  <link rel="stylesheet" href="./styles.css?v=4" />
+  <link rel="stylesheet" href="./styles.css?v=5" />
 </head>
 <body>
   <main id="app">
@@ -20,6 +20,8 @@
       <div class="top-spacer"></div>
       <button id="pauseBtn" title="Pause (P)">Ⅱ</button>
       <button id="slowBtn" title="Slow motion (T)">½</button>
+      <button id="zoomOutBtn" title="Zoom out">−</button>
+      <button id="zoomInBtn" title="Zoom in">＋</button>
       <button id="resetBtn" title="Reset scene (R)">↻</button>
     </header>
 
@@ -27,6 +29,7 @@
       <div class="palette-title">SPAWN</div>
       <button data-spawn="dummy" data-label="Dummy"><b>人</b><span>Living</span></button>
       <button data-spawn="thanos" data-label="Thanos"><b>Θ</b><span>Thanos</span></button>
+      <button data-spawn="mark42" data-label="Mark 42"><b>42</b><span>Mark 42</span></button>
       <button data-spawn="crate" data-label="Crate"><b>□</b><span>Crate</span></button>
       <button data-spawn="concrete" data-label="Concrete"><b>▣</b><span>Concrete</span></button>
       <button data-spawn="barrel" data-label="Explosive"><b>!</b><span>Explosive</span></button>
@@ -82,6 +85,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
-  <script src="./game.js?v=4"></script>
+  <script src="./game.js?v=5"></script>
 </body>
 </html>
