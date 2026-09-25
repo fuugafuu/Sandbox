@@ -3,68 +3,62 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-  <meta name="theme-color" content="#080d12" />
-  <title>Sandbox — Mark 50 Physics Lab</title>
+  <meta name="theme-color" content="#111418" />
+  <title>Sandbox — Mark 50</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <main id="app">
     <canvas id="game" aria-label="Physics sandbox"></canvas>
 
-    <section id="hud" class="glass">
-      <div class="brand"><span class="arc-dot"></span><strong>SANDBOX</strong><small>MARK 50 LAB</small></div>
-      <div class="meter-group">
-        <label>BODY <span id="healthText">100</span>%</label>
-        <div class="meter"><i id="healthBar"></i></div>
+    <section id="statusHud" aria-label="character status">
+      <div class="identity">
+        <span class="reactor"></span>
+        <div><strong>MARK 50</strong><small id="suitState">TONY / CIVILIAN</small></div>
       </div>
-      <div class="meter-group">
-        <label>NANO <span id="nanoText">100</span>%</label>
-        <div class="meter nano"><i id="nanoBar"></i></div>
-      </div>
-      <div class="meter-group">
-        <label>POWER <span id="energyText">100</span>%</label>
-        <div class="meter power"><i id="energyBar"></i></div>
-      </div>
-      <div class="status-pill" id="suitState">TONY / CIVILIAN</div>
-      <div class="status-pill weapon" id="weaponState">REPULSOR</div>
+      <div class="stat hp"><span>HP</span><div class="track"><i id="healthBar"></i></div><b id="healthText">100</b></div>
+      <div class="stat nano"><span>NANO</span><div class="track"><i id="nanoBar"></i></div><b id="nanoText">100</b></div>
+      <div class="stat power"><span>ARC</span><div class="track"><i id="energyBar"></i></div><b id="energyText">100</b></div>
     </section>
 
-    <aside id="inventory" class="glass">
-      <div class="panel-title">SPAWN</div>
-      <button data-spawn="dummy"><b>◉</b><span>Test Dummy</span></button>
-      <button data-spawn="crate"><b>□</b><span>Crate</span></button>
-      <button data-spawn="concrete"><b>▣</b><span>Concrete</span></button>
-      <button data-spawn="barrel"><b>◎</b><span>Explosive</span></button>
-      <button data-spawn="steel"><b>◆</b><span>Steel Block</span></button>
-      <hr />
-      <button id="resetBtn"><b>↻</b><span>Reset</span></button>
-      <button id="pauseBtn"><b>Ⅱ</b><span>Pause</span></button>
-      <button id="slowBtn"><b>½</b><span>Slow-mo</span></button>
+    <section id="utilityDock" class="dock" aria-label="simulation controls">
+      <button id="pauseBtn" title="Pause (P)">Ⅱ</button>
+      <button id="slowBtn" title="Slow motion (T)">½</button>
+      <button id="resetBtn" title="Reset (R)">↻</button>
+    </section>
+
+    <aside id="inventory" class="dock" aria-label="spawn objects">
+      <button data-spawn="dummy" data-label="Dummy"><b>人</b></button>
+      <button data-spawn="crate" data-label="Crate"><b>□</b></button>
+      <button data-spawn="concrete" data-label="Concrete"><b>▣</b></button>
+      <button data-spawn="barrel" data-label="Explosive"><b>!</b></button>
+      <button data-spawn="steel" data-label="Steel"><b>◆</b></button>
     </aside>
 
-    <section id="weaponDock" class="glass">
-      <button data-weapon="0" class="active"><span>1</span>Repulsor</button>
-      <button data-weapon="1"><span>2</span>Unibeam</button>
-      <button data-weapon="2"><span>3</span>Nano Blade</button>
-      <button data-weapon="3"><span>4</span>Shield</button>
-      <button data-weapon="4"><span>5</span>Ram</button>
-      <button data-weapon="5"><span>6</span>Cluster</button>
-      <button data-weapon="6"><span>7</span>Missiles</button>
+    <section id="weaponPanel">
+      <div class="weapon-label"><small>WEAPON</small><strong id="weaponState">REPULSOR</strong></div>
+      <div id="weaponDock" class="dock">
+        <button data-weapon="0" class="active" title="Repulsor"><span>1</span><b>REP</b></button>
+        <button data-weapon="1" title="Unibeam"><span>2</span><b>UNI</b></button>
+        <button data-weapon="2" title="Nano Blade"><span>3</span><b>BLD</b></button>
+        <button data-weapon="3" title="Nano Shield"><span>4</span><b>SHD</b></button>
+        <button data-weapon="4" title="Battering Ram"><span>5</span><b>RAM</b></button>
+        <button data-weapon="5" title="Cluster Cannon"><span>6</span><b>CLS</b></button>
+        <button data-weapon="6" title="Micro Missiles"><span>7</span><b>MSL</b></button>
+      </div>
     </section>
 
-    <div id="hint" class="glass">Drag objects · E suit · Q weapon · F flight · Mouse/Space fire · Wheel zoom</div>
+    <div id="desktopHelp">A D move · W jump · E suit · F flight · Q weapon · drag objects · SPACE fire</div>
 
     <section id="mobileControls">
-      <div class="mobile-left">
+      <div class="move-pad">
         <button data-hold="left">◀</button>
         <button data-hold="up">▲</button>
         <button data-hold="right">▶</button>
       </div>
-      <div class="mobile-mid">
+      <div class="mobile-actions">
         <button id="mobileSuit">SUIT</button>
-        <button id="mobileFlight">FLIGHT</button>
-      </div>
-      <div class="mobile-right">
+        <button id="mobileFlight">FLY</button>
         <button id="mobileWeapon">MODE</button>
         <button id="mobileFire" class="fire">FIRE</button>
       </div>
