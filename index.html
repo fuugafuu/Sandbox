@@ -3,41 +3,54 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-  <meta name="theme-color" content="#111418" />
-  <title>Sandbox — Mark 50</title>
-  <link rel="stylesheet" href="./styles.css?v=2" />
+  <meta name="theme-color" content="#1a1a1a" />
+  <title>Sandbox</title>
+  <link rel="stylesheet" href="./styles.css?v=3" />
 </head>
 <body>
   <main id="app">
     <canvas id="game" aria-label="Physics sandbox"></canvas>
 
-    <section id="statusHud" aria-label="character status">
-      <div class="identity">
-        <span class="reactor"></span>
-        <div><strong>MARK 50</strong><small id="suitState">TONY / CIVILIAN</small></div>
+    <header id="topbar" class="panel">
+      <div class="brand">
+        <strong>SANDBOX</strong>
+        <small>PHYSICS PLAYGROUND</small>
       </div>
-      <div class="stat hp"><span>HP</span><div class="track"><i id="healthBar"></i></div><b id="healthText">100</b></div>
-      <div class="stat nano"><span>NANO</span><div class="track"><i id="nanoBar"></i></div><b id="nanoText">100</b></div>
-      <div class="stat power"><span>ARC</span><div class="track"><i id="energyBar"></i></div><b id="energyText">100</b></div>
-    </section>
-
-    <section id="utilityDock" class="dock" aria-label="simulation controls">
+      <div class="scene-chip"><span class="dot"></span>SCENE 01</div>
+      <div class="top-spacer"></div>
       <button id="pauseBtn" title="Pause (P)">Ⅱ</button>
       <button id="slowBtn" title="Slow motion (T)">½</button>
-      <button id="resetBtn" title="Reset (R)">↻</button>
-    </section>
+      <button id="resetBtn" title="Reset scene (R)">↻</button>
+    </header>
 
-    <aside id="inventory" class="dock" aria-label="spawn objects">
-      <button data-spawn="dummy" data-label="Dummy"><b>人</b></button>
-      <button data-spawn="crate" data-label="Crate"><b>□</b></button>
-      <button data-spawn="concrete" data-label="Concrete"><b>▣</b></button>
-      <button data-spawn="barrel" data-label="Explosive"><b>!</b></button>
-      <button data-spawn="steel" data-label="Steel"><b>◆</b></button>
+    <aside id="inventory" class="panel" aria-label="spawn objects">
+      <div class="palette-title">SPAWN</div>
+      <button data-spawn="dummy" data-label="Dummy"><b>人</b><span>Living</span></button>
+      <button data-spawn="crate" data-label="Crate"><b>□</b><span>Crate</span></button>
+      <button data-spawn="concrete" data-label="Concrete"><b>▣</b><span>Concrete</span></button>
+      <button data-spawn="barrel" data-label="Explosive"><b>!</b><span>Explosive</span></button>
+      <button data-spawn="steel" data-label="Steel"><b>◆</b><span>Steel</span></button>
     </aside>
 
-    <section id="weaponPanel">
-      <div class="weapon-label"><small>WEAPON</small><strong id="weaponState">REPULSOR</strong></div>
-      <div id="weaponDock" class="dock">
+    <aside id="selectionPanel" class="panel">
+      <div class="selection-head">
+        <div>
+          <small>SELECTED</small>
+          <strong>TONY STARK</strong>
+        </div>
+        <span id="suitState">CIVILIAN</span>
+      </div>
+      <div class="stat hp"><span>HEALTH</span><div class="track"><i id="healthBar"></i></div><b id="healthText">100</b></div>
+      <div class="stat nano"><span>NANO RESERVE</span><div class="track"><i id="nanoBar"></i></div><b id="nanoText">100</b></div>
+      <div class="stat power"><span>POWER</span><div class="track"><i id="energyBar"></i></div><b id="energyText">100</b></div>
+    </aside>
+
+    <section id="weaponPanel" class="panel">
+      <div class="weapon-caption">
+        <small>SELECTED ABILITY</small>
+        <strong id="weaponState">REPULSOR</strong>
+      </div>
+      <div id="weaponDock">
         <button data-weapon="0" class="active" title="Repulsor"><span>1</span><b>REP</b></button>
         <button data-weapon="1" title="Unibeam"><span>2</span><b>UNI</b></button>
         <button data-weapon="2" title="Nano Blade"><span>3</span><b>BLD</b></button>
@@ -48,7 +61,7 @@
       </div>
     </section>
 
-    <div id="desktopHelp">A D move · W jump · E suit · F flight · Q weapon · drag objects · SPACE fire</div>
+    <div id="desktopHelp">drag = grab · A/D = move · W = jump · E = suit · F = flight · Q = ability · SPACE = use</div>
 
     <section id="mobileControls">
       <div class="move-pad">
@@ -60,7 +73,7 @@
         <button id="mobileSuit">SUIT</button>
         <button id="mobileFlight">FLY</button>
         <button id="mobileWeapon">MODE</button>
-        <button id="mobileFire" class="fire">FIRE</button>
+        <button id="mobileFire" class="fire">USE</button>
       </div>
     </section>
 
@@ -68,6 +81,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
-  <script src="./game.js?v=2"></script>
+  <script src="./game.js?v=3"></script>
 </body>
 </html>
