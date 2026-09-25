@@ -1,120 +1,107 @@
 :root{
   color-scheme:dark;
-  --ink:#e8edf0;
-  --muted:#77828a;
-  --panel:rgba(20,23,27,.82);
-  --panel2:rgba(12,14,17,.90);
-  --edge:rgba(255,255,255,.10);
-  --hot:#ef5449;
-  --gold:#d8af57;
-  --ice:#a6efff;
+  --bg:#161719;
+  --panel:rgba(31,32,35,.94);
+  --panel2:rgba(23,24,26,.92);
+  --line:rgba(255,255,255,.13);
+  --line2:rgba(255,255,255,.07);
+  --text:#f0f0ef;
+  --muted:#9b9b98;
+  --accent:#efefec;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body,#app{margin:0;width:100%;height:100%;overflow:hidden;background:#101419;color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+html,body,#app{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 button{font:inherit;color:inherit;border:0}
 #game{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair}
-.dock{background:var(--panel);border:1px solid var(--edge);box-shadow:0 8px 28px rgba(0,0,0,.28);backdrop-filter:blur(14px)}
+.panel{background:var(--panel);border:1px solid var(--line);box-shadow:0 10px 28px rgba(0,0,0,.22)}
 
-#statusHud{
-  position:absolute;top:max(14px,env(safe-area-inset-top));left:16px;
-  display:flex;align-items:center;gap:14px;
-  padding:10px 12px;border-radius:12px;
-  background:rgba(15,18,21,.78);border:1px solid rgba(255,255,255,.08);
-  box-shadow:0 8px 30px rgba(0,0,0,.22);backdrop-filter:blur(12px);
-  pointer-events:none
+#topbar{
+  position:absolute;left:12px;right:12px;top:max(10px,env(safe-area-inset-top));
+  height:46px;border-radius:5px;display:flex;align-items:center;gap:8px;padding:5px 6px 5px 12px
 }
-.identity{display:flex;align-items:center;gap:9px;padding-right:5px}
-.identity .reactor{width:20px;height:20px;border-radius:50%;border:3px solid rgba(167,239,255,.9);box-shadow:0 0 15px rgba(109,226,255,.75),inset 0 0 7px rgba(255,255,255,.8)}
-.identity div{display:flex;flex-direction:column;gap:2px}
-.identity strong{font-size:11px;letter-spacing:.15em}
-.identity small{font-size:8px;color:#8e9aa2;letter-spacing:.08em;white-space:nowrap}
-.stat{display:grid;grid-template-columns:30px 82px 24px;align-items:center;gap:6px}
-.stat>span,.stat>b{font-size:8px;letter-spacing:.08em;color:#9aa5ab}
-.stat>b{text-align:right;font-variant-numeric:tabular-nums}
-.track{height:4px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
-.track i{display:block;height:100%;width:100%;border-radius:inherit;background:#d7e0e4;transition:width .12s linear}
-.stat.nano .track i{background:var(--ice);box-shadow:0 0 9px rgba(100,222,249,.55)}
-.stat.power .track i{background:var(--gold)}
-.stat.hp .track i{background:#dfe7e8}
-
-#utilityDock{position:absolute;top:max(14px,env(safe-area-inset-top));right:16px;display:flex;gap:4px;padding:5px;border-radius:11px}
-#utilityDock button{width:36px;height:34px;border-radius:8px;background:transparent;color:#aab3b8;font-size:14px;cursor:pointer}
-#utilityDock button:hover{background:rgba(255,255,255,.08);color:white}
+.brand{display:flex;align-items:baseline;gap:9px;min-width:220px}
+.brand strong{font-size:13px;letter-spacing:.11em}
+.brand small{font-size:8px;letter-spacing:.14em;color:#888}
+.scene-chip{height:27px;padding:0 10px;border-left:1px solid var(--line2);display:flex;align-items:center;gap:7px;color:#aaa;font-size:9px;letter-spacing:.08em}
+.scene-chip .dot{width:5px;height:5px;border-radius:50%;background:#aeb6a6}
+.top-spacer{flex:1}
+#topbar button{width:35px;height:34px;border-radius:4px;background:#28292c;border:1px solid var(--line2);color:#bbb;cursor:pointer}
+#topbar button:hover{background:#343539;color:#fff}
 
 #inventory{
-  position:absolute;left:16px;top:50%;transform:translateY(-50%);
-  display:flex;flex-direction:column;gap:5px;padding:6px;border-radius:13px
+  position:absolute;left:12px;top:68px;width:118px;border-radius:5px;padding:7px
 }
-#inventory button{position:relative;width:44px;height:44px;border-radius:9px;background:transparent;color:#a7b0b5;cursor:pointer}
-#inventory button:hover{background:rgba(255,255,255,.08);color:white}
-#inventory button b{font-size:16px;font-weight:600}
-#inventory button::after{
-  content:attr(data-label);position:absolute;left:52px;top:50%;transform:translateY(-50%) translateX(-4px);
-  padding:6px 8px;border-radius:7px;background:rgba(10,12,14,.92);border:1px solid var(--edge);
-  color:#d7dde0;font-size:10px;white-space:nowrap;opacity:0;pointer-events:none;transition:.14s
-}
-#inventory button:hover::after{opacity:1;transform:translateY(-50%) translateX(0)}
+.palette-title{font-size:8px;letter-spacing:.16em;color:#7f7f7d;padding:2px 4px 8px}
+#inventory button{width:100%;height:39px;display:grid;grid-template-columns:28px 1fr;align-items:center;gap:5px;background:transparent;border-top:1px solid var(--line2);text-align:left;cursor:pointer;color:#aaa}
+#inventory button:hover{background:#292a2d;color:#fff}
+#inventory button b{display:grid;place-items:center;width:24px;height:24px;background:#3a3b3e;border:1px solid rgba(255,255,255,.09);font-size:12px;font-weight:600}
+#inventory button span{font-size:9px;letter-spacing:.02em}
 
-#weaponPanel{position:absolute;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;align-items:center;gap:8px}
-.weapon-label{height:50px;min-width:112px;padding:8px 12px;border-radius:11px;background:rgba(13,16,19,.84);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(12px);display:flex;flex-direction:column;justify-content:center}
-.weapon-label small{font-size:7px;color:#68747b;letter-spacing:.18em}
-.weapon-label strong{font-size:10px;letter-spacing:.08em;margin-top:3px}
-#weaponDock{display:flex;gap:4px;padding:5px;border-radius:12px}
-#weaponDock button{width:50px;height:40px;border-radius:8px;background:transparent;color:#6e7a80;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
-#weaponDock button span{font-size:7px;opacity:.65}
-#weaponDock button b{font-size:9px;letter-spacing:.06em}
-#weaponDock button:hover{background:rgba(255,255,255,.06);color:#c8d0d4}
-#weaponDock button.active{background:rgba(218,57,48,.15);box-shadow:inset 0 0 0 1px rgba(239,84,73,.28);color:#fff}
+#selectionPanel{
+  position:absolute;right:12px;top:68px;width:226px;border-radius:5px;padding:10px
+}
+.selection-head{display:flex;justify-content:space-between;align-items:start;padding-bottom:9px;border-bottom:1px solid var(--line2)}
+.selection-head div{display:flex;flex-direction:column;gap:2px}
+.selection-head small,.weapon-caption small{font-size:7px;letter-spacing:.15em;color:#777}
+.selection-head strong{font-size:11px;letter-spacing:.07em}
+.selection-head>span{font-size:7px;padding:4px 6px;border:1px solid var(--line);color:#aaa}
+.stat{display:grid;grid-template-columns:66px 1fr 23px;align-items:center;gap:7px;margin-top:9px}
+.stat>span,.stat>b{font-size:7px;color:#8f8f8c}
+.stat>b{text-align:right;font-variant-numeric:tabular-nums}
+.track{height:3px;background:#444548;overflow:hidden}
+.track i{display:block;width:100%;height:100%;background:#d7d7d4;transition:width .12s linear}
+.stat.nano .track i{background:#9bcbd1}
+.stat.power .track i{background:#c8b078}
 
-#desktopHelp{
-  position:absolute;left:16px;bottom:16px;padding:7px 10px;border-radius:8px;
-  background:rgba(10,12,14,.58);color:#68737a;font-size:9px;letter-spacing:.03em;
-  pointer-events:none
+#weaponPanel{
+  position:absolute;left:50%;bottom:max(12px,env(safe-area-inset-bottom));transform:translateX(-50%);
+  height:52px;border-radius:5px;padding:5px;display:flex;align-items:stretch;gap:5px
 }
-#toast{
-  position:absolute;top:86px;left:50%;transform:translate(-50%,-5px);
-  padding:8px 12px;border-radius:8px;background:rgba(12,14,16,.9);border:1px solid rgba(255,255,255,.1);
-  color:#dce3e6;font-size:10px;letter-spacing:.08em;opacity:0;transition:.16s;pointer-events:none
-}
+.weapon-caption{width:108px;padding:6px 8px;border-right:1px solid var(--line2);display:flex;flex-direction:column;justify-content:center}
+.weapon-caption strong{font-size:9px;letter-spacing:.05em;margin-top:3px}
+#weaponDock{display:flex;gap:3px}
+#weaponDock button{width:45px;border-radius:3px;background:#27282b;color:#8d8d8a;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+#weaponDock button span{font-size:7px;color:#666}
+#weaponDock button b{font-size:8px;letter-spacing:.05em}
+#weaponDock button:hover{background:#343539;color:#eee}
+#weaponDock button.active{background:#e7e7e2;color:#1c1c1d}
+#weaponDock button.active span{color:#666}
+
+#desktopHelp{position:absolute;left:12px;bottom:12px;padding:6px 8px;background:rgba(22,23,25,.65);color:#777;font-size:8px;letter-spacing:.03em;pointer-events:none}
+#toast{position:absolute;top:67px;left:50%;transform:translate(-50%,-4px);padding:7px 10px;background:#242528;border:1px solid var(--line);font-size:9px;letter-spacing:.08em;opacity:0;transition:.15s;pointer-events:none}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 
-#mobileControls{display:none;position:absolute;left:0;right:0;bottom:max(10px,env(safe-area-inset-bottom));padding:0 12px;pointer-events:none;justify-content:space-between;align-items:end}
+#mobileControls{display:none;position:absolute;left:0;right:0;bottom:max(9px,env(safe-area-inset-bottom));padding:0 10px;pointer-events:none;justify-content:space-between;align-items:end}
 #mobileControls>div{pointer-events:auto}
-.move-pad{display:grid;grid-template-columns:54px 54px 54px;gap:6px;align-items:end}
-.move-pad button,.mobile-actions button{height:54px;border-radius:15px;background:rgba(17,20,24,.82);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(12px);touch-action:none;font-weight:700}
-.mobile-actions{display:grid;grid-template-columns:50px 50px 66px;grid-template-rows:42px 58px;gap:6px}
-.mobile-actions button{height:auto;font-size:9px;border-radius:13px}
+.move-pad{display:grid;grid-template-columns:50px 50px 50px;gap:5px}
+.move-pad button,.mobile-actions button{touch-action:none;background:rgba(31,32,35,.9);border:1px solid rgba(255,255,255,.14);border-radius:8px;font-weight:700}
+.move-pad button{height:50px}
+.mobile-actions{display:grid;grid-template-columns:46px 46px 62px;grid-template-rows:38px 54px;gap:5px}
+.mobile-actions button{font-size:8px}
 #mobileSuit{grid-column:1;grid-row:1}
 #mobileFlight{grid-column:2;grid-row:1}
 #mobileWeapon{grid-column:1/3;grid-row:2}
-#mobileFire{grid-column:3;grid-row:1/3;background:rgba(151,39,34,.72);border-color:rgba(255,112,101,.34);font-size:11px}
+#mobileFire{grid-column:3;grid-row:1/3;background:rgba(225,225,220,.94);color:#19191a}
 
 @media(max-width:900px){
-  #statusHud{gap:8px;padding:8px 9px}
-  .stat{grid-template-columns:24px 58px 20px;gap:4px}
-  .identity{padding-right:0}
-  #weaponDock button{width:42px}
-  .weapon-label{min-width:96px}
+  .brand{min-width:150px}
+  .brand small{display:none}
+  #selectionPanel{width:205px}
+  #weaponDock button{width:40px}
 }
 @media(pointer:coarse),(max-width:760px){
-  #statusHud{left:8px;right:8px;top:max(8px,env(safe-area-inset-top));justify-content:space-between}
-  .identity{min-width:92px}
-  .identity .reactor{width:16px;height:16px;border-width:2px}
-  .identity strong{font-size:9px}
-  .identity small{font-size:7px}
-  .stat{display:block;width:56px}
-  .stat>span{display:block;font-size:7px;margin-bottom:3px}
+  #topbar{left:7px;right:7px;top:max(7px,env(safe-area-inset-top));height:42px}
+  #topbar .scene-chip{display:none}
+  #topbar button{width:31px;height:30px}
+  #inventory{left:7px;top:57px;width:48px;padding:4px}
+  .palette-title,#inventory button span{display:none}
+  #inventory button{display:grid;place-items:center;height:40px;border-top:0}
+  #inventory button b{width:31px;height:31px}
+  #selectionPanel{top:57px;right:7px;width:154px;padding:7px}
+  .selection-head strong{font-size:9px}
+  .selection-head>span{display:none}
+  .stat{grid-template-columns:48px 1fr;margin-top:6px;gap:5px}
   .stat>b{display:none}
-  .track{height:4px}
-  #utilityDock{top:66px;right:8px}
-  #inventory{left:8px;top:47%;padding:4px}
-  #inventory button{width:40px;height:40px}
-  #inventory button::after{display:none}
   #weaponPanel,#desktopHelp{display:none}
   #mobileControls{display:flex}
-}
-@media(max-width:430px){
-  #statusHud .stat{width:44px}
-  #statusHud{gap:5px}
-  .move-pad{grid-template-columns:48px 48px 48px}
 }
