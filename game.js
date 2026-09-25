@@ -22,6 +22,8 @@ const ui = {
   energyLabel: document.getElementById('energyLabel'),
   pauseBtn: document.getElementById('pauseBtn'),
   slowBtn: document.getElementById('slowBtn'),
+  suitPicker: document.getElementById('suitPicker'),
+  changeSuitBtn: document.getElementById('changeSuitBtn'),
   toast: document.getElementById('toast')
 };
 
@@ -38,7 +40,7 @@ const FLOOR_Y = 900;
 const input = { left:false, right:false, up:false, down:false, fire:false };
 const camera = { x: 1550, y: 545, zoom: 1, minZoom:.48, maxZoom:1.85 };
 let viewW = innerWidth, viewH = innerHeight, dpr = Math.min(devicePixelRatio || 1, 2);
-let paused = false, slowMo = false, now = 0, last = performance.now();
+let paused = false, slowMo = false, pickerOpen = true, now = 0, last = performance.now();
 let dragConstraint = null, dragPointerId = null, panning = false, panStart = null;
 let aimWorld = { x: 1220, y: 470 };
 let toastTimer = 0;
@@ -211,8 +213,8 @@ function createThanos(x,y){
   const thR=add('thighR',Bodies.rectangle(x+22,y+83,30,88,{...opts,chamfer:{radius:9}}),650);
   const caL=add('calfL',Bodies.rectangle(x-22,y+156,27,78,{...opts,chamfer:{radius:8}}),540);
   const caR=add('calfR',Bodies.rectangle(x+22,y+156,27,78,{...opts,chamfer:{radius:8}}),540);
-  const footL=add('footL',Bodies.rectangle(x-28,y+205,48,19,{...opts,chamfer:{radius:6},friction:1.2}),310);
-  const footR=add('footR',Bodies.rectangle(x+28,y+205,48,19,{...opts,chamfer:{radius:6},friction:1.2}),310);
+  const footL=add('footL',Bodies.rectangle(x-28,y+205,48,19,{...opts,chamfer:{radius:6},friction:1.45,frictionStatic:5}),310);
+  const footR=add('footR',Bodies.rectangle(x+28,y+205,48,19,{...opts,chamfer:{radius:6},friction:1.45,frictionStatic:5}),310);
   const c=(a,pa,b,pb,l,s=.86)=>Constraint.create({bodyA:a,pointA:pa,bodyB:b,pointB:pb,length:l,stiffness:s,damping:.13});
   actor.joints=[
     c(head,{x:0,y:26},torso,{x:0,y:-48},6,.88),c(torso,{x:0,y:48},pelvis,{x:0,y:-18},5,.92),
@@ -265,8 +267,8 @@ function createTony(x,y){
   const actor={
     type:'tony', health:100, nano:100, energy:100, coverage:0, suitWanted:false,
     flight:false, alive:true, facing:1, fireCooldown:0, jumpCooldown:0, shieldBody:null,
-    armorModel:'mark50', mark42State:'idle', mark42Count:0, mark42Total:24, mark42Attached:{}, mark42Required:{},
-    weaponMorph:0, stun:0, grounded:false, repairDelay:0, armor:{}, armorMax:{}, bodyHp:{}, parts:{}, bodies:[], joints:[]
+    selectedSuit:null, armorModel:'none', mark42State:'idle', mark42Count:0, mark42Total:24, mark42Attached:{}, mark42Required:{},
+    weaponMorph:0, stun:0, grounded:false, repairDelay:0, armor:{}, armorMax:{}, armorFragmented:{}, bodyHp:{}, parts:{}, bodies:[], joints:[]
   };
   const add=(name,body,maxHp,armorMax)=>{
     tag(body,{kind:'tony',partName:name,actor});
@@ -287,8 +289,8 @@ function createTony(x,y){
   const thighR=add('thighR',Bodies.rectangle(x+15,y+65,22,72,{...opts,chamfer:{radius:8}}),110,390);
   const calfL=add('calfL',Bodies.rectangle(x-15,y+126,20,66,{...opts,chamfer:{radius:7}}),95,340);
   const calfR=add('calfR',Bodies.rectangle(x+15,y+126,20,66,{...opts,chamfer:{radius:7}}),95,340);
-  const footL=add('footL',Bodies.rectangle(x-19,y+166,36,15,{...opts,chamfer:{radius:5},friction:1.15}),65,230);
-  const footR=add('footR',Bodies.rectangle(x+19,y+166,36,15,{...opts,chamfer:{radius:5},friction:1.15}),65,230);
+  const footL=add('footL',Bodies.rectangle(x-19,y+166,36,15,{...opts,chamfer:{radius:5},friction:1.35,frictionStatic:4.5}),65,230);
+  const footR=add('footR',Bodies.rectangle(x+19,y+166,36,15,{...opts,chamfer:{radius:5},friction:1.35,frictionStatic:4.5}),65,230);
 
   const c=(a,pa,b,pb,l,s=.72)=>Constraint.create({bodyA:a,pointA:pa,bodyB:b,pointB:pb,length:l,stiffness:s,damping:.11});
   actor.joints=[
@@ -336,6 +338,7 @@ function setArmorPools(model){
   const max42={head:190,torso:330,pelvis:240,upperArmL:175,upperArmR:175,forearmL:185,forearmR:185,thighL:220,thighR:220,calfL:190,calfR:190,footL:130,footR:130};
   const max50={head:340,torso:620,pelvis:430,upperArmL:300,upperArmR:300,forearmL:320,forearmR:320,thighL:390,thighR:390,calfL:340,calfR:340,footL:230,footR:230};
   const src=model==='mark42'?max42:max50;
+  tony.armorFragmented={};
   for(const name of Object.keys(tony.armorMax)){
     tony.armorMax[name]=src[name]||tony.armorMax[name];
     tony.armor[name]=tony.armorMax[name];
@@ -349,6 +352,7 @@ function clearMark42Pieces(){
 }
 function summonMark42(){
   clearMark42Pieces();
+  tony.selectedSuit='mark42';
   if(tony.shieldBody){Composite.remove(world,tony.shieldBody);tony.shieldBody=null;}
   tony.flight=false;
   tony.suitWanted=false;
@@ -459,7 +463,8 @@ function resetScene(){
   selectedActor=tony;
   camera.x=1550; camera.y=540;
   weaponMode=0; updateWeaponUI();
-  toast('SCENE RESET');
+  openSuitPicker(true);
+  toast('CHOOSE A SUIT');
 }
 resetScene();
 
@@ -473,6 +478,33 @@ function recalcTonyHealth(){
   }
   tony.health=clamp(cur/max*100,0,100);
   tony.alive=tony.health>0;
+}
+function spawnArmorFragments(body,name,model,point,energy=0){
+  const center=point||body.position;
+  const count=model==='mark42'?5:7;
+  const dims=armorDims(name);
+  for(let i=0;i<count;i++){
+    const large=model==='mark42'&&i===0;
+    const w=large?clamp(dims.w*.38,9,20):clamp(dims.w*(.12+rand(.02,.12)),4,12);
+    const h=large?clamp(dims.h*.22,8,18):clamp(dims.h*(.08+rand(.02,.10)),3,10);
+    const a=rand(-Math.PI,Math.PI);
+    const frag=Bodies.rectangle(
+      center.x+Math.cos(a)*rand(2,10),
+      center.y+Math.sin(a)*rand(2,10),
+      w,h,
+      {density:model==='mark42'?.0042:.0028,friction:.55,restitution:.16,angle:body.angle+rand(-.8,.8),chamfer:{radius:1}}
+    );
+    tag(frag,{kind:'armorFragment',armorModel:model,partName:name,ttl:6+rand(0,3)});
+    const impulse=2.4+rand(0,4.5)+Math.min(5,energy*.025);
+    Body.setVelocity(frag,{
+      x:body.velocity.x+Math.cos(a)*impulse,
+      y:body.velocity.y+Math.sin(a)*impulse-rand(.5,2.8)
+    });
+    Body.setAngularVelocity(frag,rand(-.35,.35));
+    Composite.add(world,frag);
+    debris.push(frag);
+  }
+  spark(center,model==='mark42'?7:10,false);
 }
 function damageBody(body,amount,point,source='impact'){
   if(!body || amount<=0) return;
@@ -496,7 +528,8 @@ function damageBody(body,amount,point,source='impact'){
 
     if(tony.coverage>.60 && presence>.55 && tony.armor[name]>0){
       const armorCost=incoming*armorCostScale;
-      const absorbed=Math.min(tony.armor[name],armorCost);
+      const beforeArmor=tony.armor[name];
+      const absorbed=Math.min(beforeArmor,armorCost);
       tony.armor[name]-=absorbed;
       tony.repairDelay=Math.max(tony.repairDelay,.75);
 
@@ -511,7 +544,11 @@ function damageBody(body,amount,point,source='impact'){
       }
 
       const ratio=tony.armor[name]/tony.armorMax[name];
-      if(ratio<.08 && ratio+(absorbed/tony.armorMax[name])>=.08){
+      if(beforeArmor>0 && tony.armor[name]<=0 && !tony.armorFragmented[name]){
+        tony.armorFragmented[name]=true;
+        spawnArmorFragments(body,name,is42?'mark42':'mark50',point,amount);
+        toast(name.toUpperCase()+' ARMOR SHATTERED');
+      } else if(ratio<.08 && ratio+(absorbed/tony.armorMax[name])>=.08){
         toast(name.toUpperCase()+' ARMOR BREACHED');
       }
     } else if(tony.coverage>.20 && presence>.18){
@@ -793,9 +830,9 @@ function activeRagdoll(dt){
   if(!tony.alive || tony.flight) return;
 
   const moving=(input.right?1:0)-(input.left?1:0);
-  const torsoUpright=Math.abs(shortestAngle(0,p.torso.angle))<.62;
-  const pelvisBelowTorso=p.pelvis.position.y>p.torso.position.y+28;
-  const feetBelowPelvis=p.footL.position.y>p.pelvis.position.y+70 && p.footR.position.y>p.pelvis.position.y+70;
+  const torsoUpright=Math.abs(shortestAngle(0,p.torso.angle))<.72;
+  const pelvisBelowTorso=p.pelvis.position.y>p.torso.position.y+26;
+  const feetBelowPelvis=p.footL.position.y>p.pelvis.position.y+66 && p.footR.position.y>p.pelvis.position.y+66;
   const canBalance=tony.grounded && torsoUpright && pelvisBelowTorso && feetBelowPelvis && tony.stun<=0;
 
   applyHumanJointLimits(p,false);
@@ -821,18 +858,31 @@ function activeRagdoll(dt){
   // standing posture. Once knocked flat, there is no invisible self-righting force.
   if(!canBalance) return;
 
-  const lean=moving*.065;
-  poseMotor(p.torso,lean,.13,.10,.11);
+  const lean=moving*.055;
+  poseMotor(p.torso,lean,.25,.14,.19);
+  poseMotor(p.pelvis,lean*.35,.22,.13,.17);
   const center=(p.footL.position.x+p.footR.position.x)*.5;
-  const balance=clamp(center-p.pelvis.position.x,-24,24);
+  const balance=clamp(center-p.pelvis.position.x,-30,30);
   const g=engine.gravity.scale*engine.gravity.y;
+
+  // Strong standing balance, but only while already standing. No recovery torque
+  // is applied after the body has fallen outside the standing gate above.
   Body.applyForce(p.torso,p.torso.position,{
-    x:balance*.000008*finiteMass(p.torso),
-    y:-g*finiteMass(p.torso)*.10
+    x:balance*.000016*finiteMass(p.torso),
+    y:-g*finiteMass(p.torso)*.22
   });
   Body.applyForce(p.pelvis,p.pelvis.position,{
-    x:balance*.000006*finiteMass(p.pelvis),
-    y:-g*finiteMass(p.pelvis)*.06
+    x:balance*.000013*finiteMass(p.pelvis),
+    y:-g*finiteMass(p.pelvis)*.15
+  });
+
+  const leftTarget=p.pelvis.position.x-17;
+  const rightTarget=p.pelvis.position.x+17;
+  Body.applyForce(p.footL,p.footL.position,{
+    x:clamp(leftTarget-p.footL.position.x,-24,24)*.000025*finiteMass(p.footL),y:0
+  });
+  Body.applyForce(p.footR,p.footR.position,{
+    x:clamp(rightTarget-p.footR.position.x,-24,24)*.000025*finiteMass(p.footR),y:0
   });
 }
 function updateTony(dt){
@@ -904,8 +954,8 @@ function updateThanoses(dt){
     a.stun=Math.max(0,a.stun-dt);
     const p=a.parts;
     a.grounded=[p.footL,p.footR].some(f=>Query.collides(f,supports).length>0 || f.bounds.max.y>FLOOR_Y-38);
-    const upright=Math.abs(shortestAngle(0,p.torso.angle))<.65;
-    const plausible=a.grounded&&upright&&p.pelvis.position.y>p.torso.position.y+35&&p.footL.position.y>p.pelvis.position.y+85&&p.footR.position.y>p.pelvis.position.y+85&&a.stun<=0;
+    const upright=Math.abs(shortestAngle(0,p.torso.angle))<.75;
+    const plausible=a.grounded&&upright&&p.pelvis.position.y>p.torso.position.y+32&&p.footL.position.y>p.pelvis.position.y+80&&p.footR.position.y>p.pelvis.position.y+80&&a.stun<=0;
     const tone=a.stun>0?.32:1;
     applyHumanJointLimits(p,true);
 
@@ -923,10 +973,15 @@ function updateThanoses(dt){
     relativePoseMotor(p.footR,p.calfR,0,.19*tone,.11,.13);
 
     if(plausible){
-      poseMotor(p.torso,0,.15,.11,.12);
+      poseMotor(p.torso,0,.28,.15,.20);
+      poseMotor(p.pelvis,0,.24,.14,.18);
       const center=(p.footL.position.x+p.footR.position.x)*.5;
-      const balance=clamp(center-p.pelvis.position.x,-30,30);
-      Body.applyForce(p.torso,p.torso.position,{x:balance*.000009*finiteMass(p.torso),y:-engine.gravity.scale*engine.gravity.y*finiteMass(p.torso)*.11});
+      const balance=clamp(center-p.pelvis.position.x,-38,38);
+      const g=engine.gravity.scale*engine.gravity.y;
+      Body.applyForce(p.torso,p.torso.position,{x:balance*.000018*finiteMass(p.torso),y:-g*finiteMass(p.torso)*.23});
+      Body.applyForce(p.pelvis,p.pelvis.position,{x:balance*.000013*finiteMass(p.pelvis),y:-g*finiteMass(p.pelvis)*.14});
+      Body.applyForce(p.footL,p.footL.position,{x:clamp((p.pelvis.position.x-23)-p.footL.position.x,-30,30)*.000026*finiteMass(p.footL),y:0});
+      Body.applyForce(p.footR,p.footR.position,{x:clamp((p.pelvis.position.x+23)-p.footR.position.x,-30,30)*.000026*finiteMass(p.footR),y:0});
     }
   }
 }
@@ -972,18 +1027,31 @@ function updateCamera(){
   camera.y=clamp(camera.y,120,980);
 }
 
+function physicsSubsteps(){
+  let maxSpeed=0;
+  for(const b of Composite.allBodies(world)){
+    if(b.isStatic) continue;
+    const speed=Math.hypot(b.velocity.x,b.velocity.y);
+    if(speed>maxSpeed) maxSpeed=speed;
+  }
+  return clamp(Math.ceil(maxSpeed/7),1,8);
+}
 function update(dt){
-  if(paused) return;
+  if(paused||pickerOpen) return;
   const scaled=dt*(slowMo?.28:1);
+  const steps=physicsSubsteps();
+  const sub=scaled/steps;
 
-  // Controllers apply forces before the solver step so the ragdolls respond in
-  // the same frame instead of feeling delayed or rubbery.
-  updateTony(scaled);
-  updateMark42Pieces(scaled);
-  updateThanoses(scaled);
-  updateMissiles(scaled);
-  updateShield(scaled);
-  Engine.update(engine,Math.min(33,scaled*1000));
+  // High-speed bodies are solved in multiple smaller steps. This greatly reduces
+  // tunnelling through walls when heavy props are thrown at extreme speed.
+  for(let i=0;i<steps;i++){
+    updateTony(sub);
+    updateMark42Pieces(sub);
+    updateThanoses(sub);
+    updateMissiles(sub);
+    updateShield(sub);
+    Engine.update(engine,Math.min(12,sub*1000));
+  }
 
   updateDebris(scaled);
   updateEffects(scaled);
@@ -1039,6 +1107,19 @@ function drawWorldBody(body){
     ctx.restore();
   } else if(kind==='platform'){
     ctx.fillStyle='#3c464c';ctx.fill();ctx.strokeStyle='#7a888f';ctx.lineWidth=1.4;ctx.stroke();
+  } else if(kind==='armorFragment'){
+    const model=p.armorModel||'mark50';
+    const g=ctx.createLinearGradient(body.bounds.min.x,body.bounds.min.y,body.bounds.max.x,body.bounds.max.y);
+    if(model==='mark42'){
+      if((body.id%3)===0){g.addColorStop(0,'#bd4b43');g.addColorStop(1,'#6b2424');}
+      else {g.addColorStop(0,'#e2c27d');g.addColorStop(.5,'#ad813b');g.addColorStop(1,'#65451f');}
+      ctx.strokeStyle='rgba(238,211,160,.55)';
+    }else{
+      if((body.id%4)===0){g.addColorStop(0,'#c18d43');g.addColorStop(1,'#68451e');}
+      else {g.addColorStop(0,'#d34d43');g.addColorStop(.45,'#9d2d30');g.addColorStop(1,'#54171c');}
+      ctx.strokeStyle='rgba(237,111,96,.55)';
+    }
+    ctx.fillStyle=g;ctx.fill();ctx.lineWidth=.8;ctx.stroke();
   } else if(kind==='mark42piece'){
     const idx=p.pieceIndex||0;
     const isRed=idx%5===0||idx%7===0;
@@ -1485,13 +1566,16 @@ function updateHUD(){
     ui.healthLabel.textContent='HEALTH';ui.energyLabel.textContent='POWER';
     ui.healthText.textContent=hp;ui.energyText.textContent=power;
     ui.healthBar.style.width=hp+'%';ui.energyBar.style.width=power+'%';
-    if(tony.armorModel==='mark42'){
+    if(tony.selectedSuit==='mark42'){
       const assembly=Math.round(tony.coverage*100);
       ui.nanoLabel.textContent='ASSEMBLY';ui.nanoText.textContent=assembly;ui.nanoBar.style.width=assembly+'%';
-      ui.suitState.textContent=tony.mark42State==='assembled'?'MARK 42':'MARK 42 / '+assembly+'%';
-    }else{
+      ui.suitState.textContent=tony.mark42State==='assembled'?'MARK 42':tony.armorModel==='none'?'MARK 42 / READY':'MARK 42 / '+assembly+'%';
+    }else if(tony.selectedSuit==='mark50'){
       ui.nanoLabel.textContent='NANO RESERVE';ui.nanoText.textContent=nano;ui.nanoBar.style.width=nano+'%';
-      ui.suitState.textContent=tony.coverage<.05?'CIVILIAN':tony.coverage>.96?'MARK 50':'NANOTECH '+Math.round(tony.coverage*100)+'%';
+      ui.suitState.textContent=tony.coverage<.05?'MARK 50 / READY':tony.coverage>.96?'MARK 50':'NANOTECH '+Math.round(tony.coverage*100)+'%';
+    }else{
+      ui.nanoLabel.textContent='SUIT';ui.nanoText.textContent='—';ui.nanoBar.style.width='0%';
+      ui.suitState.textContent='CHOOSE SUIT';
     }
   }
   ui.weaponState.textContent=weaponNames[weaponMode];
@@ -1502,17 +1586,50 @@ function updateWeaponUI(){
 }
 function setWeapon(i){
   let next=(i+weaponNames.length)%weaponNames.length;
-  if(tony.armorModel==='mark42'&&next>1) next=0;
+  if(tony.selectedSuit==='mark42'&&next>1) next=0;
   weaponMode=next;updateWeaponUI();toast(weaponNames[weaponMode]);
 }
+function isSuitOff(){
+  if(!tony) return true;
+  if(tony.selectedSuit==='mark42') return tony.armorModel==='none'&&tony.mark42State==='idle'&&tony.coverage<.02;
+  if(tony.selectedSuit==='mark50') return !tony.suitWanted&&tony.coverage<.02;
+  return true;
+}
+function openSuitPicker(initial=false){
+  if(!tony) return;
+  if(!initial&&!isSuitOff()){toast('REMOVE CURRENT SUIT FIRST');return;}
+  pickerOpen=true;
+  ui.suitPicker.classList.add('open');
+}
+function chooseSuit(choice){
+  if(!['mark50','mark42'].includes(choice)) return;
+  clearMark42Pieces();
+  tony.flight=false;
+  tony.suitWanted=false;
+  tony.coverage=0;
+  tony.mark42State='idle';
+  tony.mark42Count=0;
+  tony.mark42Attached={};
+  tony.selectedSuit=choice;
+  tony.armorModel='none';
+  tony.nano=100;
+  setArmorPools(choice);
+  weaponMode=0;updateWeaponUI();
+  pickerOpen=false;
+  ui.suitPicker.classList.remove('open');
+  toast(choice==='mark42'?'MARK 42 SELECTED':'MARK 50 SELECTED');
+}
 function toggleSuit(){
-  if(tony.armorModel==='mark42'){
-    if(tony.mark42State==='assembled') releaseMark42();
-    else summonMark42();
-    return;
+  if(!tony.selectedSuit){openSuitPicker(true);return;}
+  if(tony.selectedSuit==='mark42'){
+    if(tony.mark42State==='assembling'){toast('MARK 42 ASSEMBLING');return;}
+    if(tony.mark42State==='assembled'){releaseMark42();return;}
+    summonMark42();return;
   }
+
   if(tony.armorModel==='none'){
-    tony.armorModel='mark50';setArmorPools('mark50');tony.nano=100;
+    tony.armorModel='mark50';
+    setArmorPools('mark50');
   }
   tony.suitWanted=!tony.suitWanted;
   if(!tony.suitWanted) tony.flight=false;
@@ -1645,7 +1762,6 @@ document.querySelectorAll('[data-spawn]').forEach(btn=>btn.addEventListener('cli
   const k=btn.dataset.spawn;
   if(k==='dummy')createDummy(p.x,p.y);
   if(k==='thanos'){const a=createThanos(p.x,p.y-70);selectedActor=a;}
-  if(k==='mark42')summonMark42();
   if(k==='crate')spawnCrate(p.x,p.y);
   if(k==='concrete')spawnConcrete(p.x,p.y);
   if(k==='barrel')spawnBarrel(p.x,p.y);
@@ -1653,6 +1769,8 @@ document.querySelectorAll('[data-spawn]').forEach(btn=>btn.addEventListener('cli
   toast(k.toUpperCase()+' SPAWNED');
 }));
 document.getElementById('resetBtn').addEventListener('click',resetScene);
+document.querySelectorAll('[data-suit-choice]').forEach(btn=>btn.addEventListener('click',()=>chooseSuit(btn.dataset.suitChoice)));
+ui.changeSuitBtn.addEventListener('click',()=>openSuitPicker(false));
 document.getElementById('zoomInBtn').addEventListener('click',()=>{camera.zoom=clamp(camera.zoom*1.18,camera.minZoom,camera.maxZoom);});
 document.getElementById('zoomOutBtn').addEventListener('click',()=>{camera.zoom=clamp(camera.zoom/1.18,camera.minZoom,camera.maxZoom);});
 ui.pauseBtn.addEventListener('click',()=>{paused=!paused;toast(paused?'PAUSED':'RESUME');});
