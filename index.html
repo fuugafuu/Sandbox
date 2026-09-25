@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <meta name="theme-color" content="#1a1a1a" />
   <title>Sandbox</title>
-  <link rel="stylesheet" href="./styles.css?v=3" />
+  <link rel="stylesheet" href="./styles.css?v=4" />
 </head>
 <body>
   <main id="app">
@@ -26,6 +26,7 @@
     <aside id="inventory" class="panel" aria-label="spawn objects">
       <div class="palette-title">SPAWN</div>
       <button data-spawn="dummy" data-label="Dummy"><b>人</b><span>Living</span></button>
+      <button data-spawn="thanos" data-label="Thanos"><b>Θ</b><span>Thanos</span></button>
       <button data-spawn="crate" data-label="Crate"><b>□</b><span>Crate</span></button>
       <button data-spawn="concrete" data-label="Concrete"><b>▣</b><span>Concrete</span></button>
       <button data-spawn="barrel" data-label="Explosive"><b>!</b><span>Explosive</span></button>
@@ -36,18 +37,18 @@
       <div class="selection-head">
         <div>
           <small>SELECTED</small>
-          <strong>TONY STARK</strong>
+          <strong id="selectedName">TONY STARK</strong>
         </div>
         <span id="suitState">CIVILIAN</span>
       </div>
-      <div class="stat hp"><span>HEALTH</span><div class="track"><i id="healthBar"></i></div><b id="healthText">100</b></div>
-      <div class="stat nano"><span>NANO RESERVE</span><div class="track"><i id="nanoBar"></i></div><b id="nanoText">100</b></div>
-      <div class="stat power"><span>POWER</span><div class="track"><i id="energyBar"></i></div><b id="energyText">100</b></div>
+      <div class="stat hp"><span id="healthLabel">HEALTH</span><div class="track"><i id="healthBar"></i></div><b id="healthText">100</b></div>
+      <div class="stat nano"><span id="nanoLabel">NANO RESERVE</span><div class="track"><i id="nanoBar"></i></div><b id="nanoText">100</b></div>
+      <div class="stat power"><span id="energyLabel">POWER</span><div class="track"><i id="energyBar"></i></div><b id="energyText">100</b></div>
     </aside>
 
     <section id="weaponPanel" class="panel">
       <div class="weapon-caption">
-        <small>SELECTED ABILITY</small>
+        <small>TONY ABILITY</small>
         <strong id="weaponState">REPULSOR</strong>
       </div>
       <div id="weaponDock">
@@ -61,7 +62,7 @@
       </div>
     </section>
 
-    <div id="desktopHelp">drag = grab · A/D = move · W = jump · E = suit · F = flight · Q = ability · SPACE = use</div>
+    <div id="desktopHelp">empty drag = camera · object drag = grab · A/D = Tony move · W = jump · E = suit · F = flight · SPACE = use</div>
 
     <section id="mobileControls">
       <div class="move-pad">
@@ -81,6 +82,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
-  <script src="./game.js?v=3"></script>
+  <script src="./game.js?v=4"></script>
 </body>
 </html>
