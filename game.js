@@ -16,6 +16,10 @@ const ui = {
   energyText: document.getElementById('energyText'),
   suitState: document.getElementById('suitState'),
   weaponState: document.getElementById('weaponState'),
+  selectedName: document.getElementById('selectedName'),
+  healthLabel: document.getElementById('healthLabel'),
+  nanoLabel: document.getElementById('nanoLabel'),
+  energyLabel: document.getElementById('energyLabel'),
   pauseBtn: document.getElementById('pauseBtn'),
   slowBtn: document.getElementById('slowBtn'),
   toast: document.getElementById('toast')
@@ -29,7 +33,7 @@ const world = engine.world;
 const W = 3200;
 const FLOOR_Y = 900;
 const input = { left:false, right:false, up:false, down:false, fire:false };
-const camera = { x: 1000, y: 545, zoom: 1, targetZoom: 1 };
+const camera = { x: 1550, y: 545, zoom: 1 };
 let viewW = innerWidth, viewH = innerHeight, dpr = Math.min(devicePixelRatio || 1, 2);
 let paused = false, slowMo = false, now = 0, last = performance.now();
 let dragConstraint = null, dragPointerId = null, panning = false, panStart = null;
@@ -39,7 +43,9 @@ let sceneSeed = 1;
 const effects = [];
 const debris = [];
 const missiles = [];
+const thanoses = [];
 const explosiveBodies = new Set();
+let selectedActor = null;
 const weaponNames = ['REPULSOR','UNIBEAM','NANO BLADE','NANO SHIELD','BATTERING RAM','CLUSTER CANNON','MICRO-MISSILES'];
 let weaponMode = 0;
 
@@ -104,7 +110,7 @@ function resize(){
   canvas.height = Math.floor(viewH*dpr);
   canvas.style.width = viewW+'px';
   canvas.style.height = viewH+'px';
-  camera.targetZoom = viewW < 760 ? 0.68 : viewW < 1100 ? 0.82 : 1;
+  camera.zoom = 1;
 }
 addEventListener('resize', resize);
 resize();
@@ -180,6 +186,41 @@ function spawnBarrel(x,y){
 function ragdollPart(kind,name,body,maxHp=100){
   tag(body,{kind,partName:name,hp:maxHp,maxHp});
   return body;
+}
+
+function createThanos(x,y){
+  const group=Body.nextGroup(true);
+  const opts={collisionFilter:{group},friction:1.0,frictionAir:.018,restitution:.03,density:.0048};
+  const actor={type:'thanos',name:'THANOS',health:100,maxHealth:5200,rawHealth:5200,parts:{},bodies:[],joints:[],stun:0,grounded:false};
+  const add=(name,body,hp)=>{
+    tag(body,{kind:'thanos',partName:name,actor,hp,maxHp:hp});
+    actor.parts[name]=body;actor.bodies.push(body);return body;
+  };
+  const head=add('head',Bodies.circle(x,y-138,31,{...opts,density:.0038}),520);
+  const torso=add('torso',Bodies.rectangle(x,y-60,78,104,{...opts,chamfer:{radius:15},density:.0062}),1100);
+  const pelvis=add('pelvis',Bodies.rectangle(x,y+13,64,42,{...opts,chamfer:{radius:10}}),760);
+  const uaL=add('upperArmL',Bodies.rectangle(x-53,y-61,27,75,{...opts,chamfer:{radius:9}}),520);
+  const uaR=add('upperArmR',Bodies.rectangle(x+53,y-61,27,75,{...opts,chamfer:{radius:9}}),520);
+  const faL=add('forearmL',Bodies.rectangle(x-57,y-2,25,68,{...opts,chamfer:{radius:8},density:.0060}),520);
+  const faR=add('forearmR',Bodies.rectangle(x+57,y-2,25,68,{...opts,chamfer:{radius:8}}),460);
+  const thL=add('thighL',Bodies.rectangle(x-22,y+83,30,88,{...opts,chamfer:{radius:9}}),650);
+  const thR=add('thighR',Bodies.rectangle(x+22,y+83,30,88,{...opts,chamfer:{radius:9}}),650);
+  const caL=add('calfL',Bodies.rectangle(x-22,y+156,27,78,{...opts,chamfer:{radius:8}}),540);
+  const caR=add('calfR',Bodies.rectangle(x+22,y+156,27,78,{...opts,chamfer:{radius:8}}),540);
+  const footL=add('footL',Bodies.rectangle(x-28,y+205,48,19,{...opts,chamfer:{radius:6},friction:1.2}),310);
+  const footR=add('footR',Bodies.rectangle(x+28,y+205,48,19,{...opts,chamfer:{radius:6},friction:1.2}),310);
+  const c=(a,pa,b,pb,l,s=.86)=>Constraint.create({bodyA:a,pointA:pa,bodyB:b,pointB:pb,length:l,stiffness:s,damping:.13});
+  actor.joints=[
+    c(head,{x:0,y:26},torso,{x:0,y:-48},6,.88),c(torso,{x:0,y:48},pelvis,{x:0,y:-18},5,.92),
+    c(torso,{x:-38,y:-31},uaL,{x:0,y:-34},5,.80),c(torso,{x:38,y:-31},uaR,{x:0,y:-34},5,.80),
+    c(uaL,{x:0,y:34},faL,{x:0,y:-30},5,.74),c(uaR,{x:0,y:34},faR,{x:0,y:-30},5,.74),
+    c(pelvis,{x:-19,y:17},thL,{x:0,y:-40},5,.88),c(pelvis,{x:19,y:17},thR,{x:0,y:-40},5,.88),
+    c(thL,{x:0,y:40},caL,{x:0,y:-35},5,.84),c(thR,{x:0,y:40},caR,{x:0,y:-35},5,.84),
+    c(caL,{x:0,y:35},footL,{x:11,y:-3},4,.84),c(caR,{x:0,y:35},footR,{x:-11,y:-3},4,.84)
+  ];
+  Composite.add(world,[...actor.bodies,...actor.joints]);
+  thanoses.push(actor);
+  return actor;
 }
 function createDummy(x,y){
   const g=Body.nextGroup(true);
@@ -284,15 +325,17 @@ function clearDynamic(){
 }
 function resetScene(){
   Composite.clear(world,false,true);
-  effects.length=0; debris.length=0; missiles.length=0; explosiveBodies.clear();
+  effects.length=0; debris.length=0; missiles.length=0; thanoses.length=0; explosiveBodies.clear();
   sceneSeed=1;
   createEnvironment();
   spawnCrate(1200,540); spawnCrate(1276,540);
   spawnConcrete(1350,600); spawnBarrel(1440,580);
   spawnSteel(1710,610);
-  createDummy(1950,650);
+  createDummy(2700,650);
   tony=createTony(980,690);
-  camera.x=1000; camera.y=540;
+  createThanos(2020,650);
+  selectedActor=tony;
+  camera.x=1550; camera.y=540;
   weaponMode=0; updateWeaponUI();
   toast('SCENE RESET');
 }
@@ -357,6 +400,15 @@ function damageBody(body,amount,point,source='impact'){
       tony.bodyHp[name]=Math.max(0,tony.bodyHp[name]-incoming);
       recalcTonyHealth();
     }
+  } else if(p.kind==='thanos'){
+    const actor=p.actor;
+    const scale=source==='impact'?.30:source==='explosion'?.46:source==='energy'?.50:.42;
+    const dealt=amount*scale;
+    p.hp=Math.max(0,(p.hp??p.maxHp)-dealt);
+    actor.rawHealth=Math.max(0,actor.rawHealth-dealt);
+    actor.health=clamp(actor.rawHealth/actor.maxHealth*100,0,100);
+    actor.stun=Math.max(actor.stun,clamp((amount-18)*.012,0,.65));
+    if(p.hp<=0) body.frictionAir=.035;
   } else if(p.kind==='dummy'){
     p.hp=Math.max(0,(p.hp??70)-amount);
     if(p.hp<=0) body.frictionAir=.045;
@@ -680,6 +732,30 @@ function updateTony(dt){
   doWeapon(dt);
 }
 
+function updateThanoses(dt){
+  const supports=Composite.allBodies(world).filter(b=>b.isStatic && (b.plugin?.kind==='ground'||b.plugin?.kind==='platform'));
+  for(const a of thanoses){
+    if(a.health<=0) continue;
+    a.stun=Math.max(0,a.stun-dt);
+    const p=a.parts;
+    a.grounded=[p.footL,p.footR].some(f=>Query.collides(f,supports).length>0 || f.bounds.max.y>FLOOR_Y-38);
+    const dragged=!!(dragConstraint&&dragConstraint.bodyB?.plugin?.actor===a);
+    const k=(a.stun>0?.20:1)*(dragged?.05:1)*(a.grounded?1:.28);
+    if(k>.01){
+      poseMotor(p.torso,0,.24*k,.12,.18*k+.015);poseMotor(p.pelvis,0,.25*k,.12,.18*k+.015);poseMotor(p.head,0,.19*k,.10,.14*k+.01);
+      poseMotor(p.thighL,0,.20*k,.10,.15*k+.01);poseMotor(p.thighR,0,.20*k,.10,.15*k+.01);
+      poseMotor(p.calfL,0,.22*k,.11,.16*k+.01);poseMotor(p.calfR,0,.22*k,.11,.16*k+.01);
+      poseMotor(p.footL,0,.26*k,.13,.18*k+.01);poseMotor(p.footR,0,.26*k,.13,.18*k+.01);
+      poseMotor(p.upperArmL,.08,.10*k,.07,.08*k+.006);poseMotor(p.upperArmR,-.08,.10*k,.07,.08*k+.006);
+      poseMotor(p.forearmL,.02,.09*k,.07,.08*k+.006);poseMotor(p.forearmR,-.02,.09*k,.07,.08*k+.006);
+      if(a.grounded&&k>.2){
+        const center=(p.footL.position.x+p.footR.position.x)*.5;
+        const balance=clamp(center-p.pelvis.position.x,-36,36);
+        Body.applyForce(p.torso,p.torso.position,{x:balance*.000014*finiteMass(p.torso),y:-engine.gravity.scale*engine.gravity.y*finiteMass(p.torso)*.17});
+      }
+    }
+  }
+}
 function updateMissiles(dt){
   for(let i=missiles.length-1;i>=0;i--){
     const m=missiles[i]; m.life-=dt;
@@ -714,15 +790,12 @@ function updateEffects(dt){
     if(e.life<=0) effects.splice(i,1);
   }
 }
-function updateCamera(dt){
-  const p=tony.parts.torso.position;
-  const dx=p.x-camera.x,dy=(p.y-20)-camera.y;
-  const deadX=viewW/camera.zoom*.18,deadY=viewH/camera.zoom*.14;
-  if(Math.abs(dx)>deadX) camera.x+=Math.sign(dx)*(Math.abs(dx)-deadX)*Math.min(1,dt*4);
-  if(Math.abs(dy)>deadY) camera.y+=Math.sign(dy)*(Math.abs(dy)-deadY)*Math.min(1,dt*4);
-  camera.x=clamp(camera.x,viewW/(2*camera.zoom)-30,W-viewW/(2*camera.zoom)+30);
-  camera.y=clamp(camera.y,220,820);
-  camera.zoom=lerp(camera.zoom,camera.targetZoom,1-Math.pow(.02,dt));
+function updateCamera(){
+  // Free sandbox camera: never follows Tony or any selected character.
+  camera.zoom=1;
+  const halfW=viewW/2;
+  camera.x=clamp(camera.x,Math.min(halfW,W/2),Math.max(W-halfW,W/2));
+  camera.y=clamp(camera.y,200,900);
 }
 
 function update(dt){
@@ -730,6 +803,7 @@ function update(dt){
   const scaled=dt*(slowMo?.28:1);
   Engine.update(engine,Math.min(33,scaled*1000));
   updateTony(scaled);
+  updateThanoses(scaled);
   updateMissiles(scaled);
   updateShield(scaled);
   updateDebris(scaled);
@@ -1009,6 +1083,43 @@ function drawTony(){
   for(const name of order) drawTonyBase(tony.parts[name],name);
   for(const name of order) drawArmor(tony.parts[name],name,armorPresence(name));
 }
+function drawThanosPart(body,name){
+  ctx.save();ctx.translate(body.position.x,body.position.y);ctx.rotate(body.angle);
+  const purple='#7b5a88',purpleDark='#513b61',armor='#3e5364',gold='#b79042',goldHi='#dfbd68';
+  if(name==='head'){
+    ctx.fillStyle=purple;ctx.strokeStyle=purpleDark;ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(0,0,31,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#1f1820';ctx.fillRect(-13,-5,5,2);ctx.fillRect(8,-5,5,2);
+    ctx.strokeStyle='rgba(55,37,62,.75)';ctx.lineWidth=1;
+    for(let x=-12;x<=12;x+=6){ctx.beginPath();ctx.moveTo(x,13);ctx.lineTo(x*.78,27);ctx.stroke();}
+  } else {
+    let w=27,h=70;
+    if(name==='torso'){w=78;h=104;}else if(name==='pelvis'){w=64;h=42;}
+    else if(name.includes('thigh')){w=30;h=88;}else if(name.includes('calf')){w=27;h=78;}
+    else if(name.includes('foot')){w=48;h=19;}else if(name.includes('upperArm')){w=27;h=75;}else if(name.includes('forearm')){w=25;h=68;}
+    const isArm=name.includes('Arm')||name.includes('forearm');
+    ctx.fillStyle=(name==='torso'||name==='pelvis'||name.includes('thigh')||name.includes('calf'))?armor:purple;
+    ctx.strokeStyle='#252c31';ctx.lineWidth=1.3;ctx.beginPath();ctx.roundRect(-w/2,-h/2,w,h,Math.min(10,w/2));ctx.fill();ctx.stroke();
+    if(name==='torso'){
+      ctx.fillStyle=gold;ctx.beginPath();ctx.moveTo(-32,-44);ctx.lineTo(-13,-30);ctx.lineTo(-18,38);ctx.lineTo(-34,22);ctx.closePath();ctx.fill();
+      ctx.beginPath();ctx.moveTo(32,-44);ctx.lineTo(13,-30);ctx.lineTo(18,38);ctx.lineTo(34,22);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#1d2429';ctx.fillRect(-11,-42,22,84);
+    } else if(name==='forearmL'){
+      const g=ctx.createLinearGradient(-w/2,-h/2,w/2,h/2);g.addColorStop(0,goldHi);g.addColorStop(1,'#725325');
+      ctx.fillStyle=g;ctx.beginPath();ctx.roundRect(-w/2-2,-h/2,w+4,h,6);ctx.fill();ctx.strokeStyle='#5b431f';ctx.stroke();
+      const stones=[['#8fd1ff',-6,-16],['#e9565d',6,-12],['#b56fe8',0,-1],['#f4d95d',-6,11],['#6ed58a',6,14],['#e58d46',0,25]];
+      for(const [col,x,y] of stones){ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=5;ctx.beginPath();ctx.arc(x,y,2.4,0,Math.PI*2);ctx.fill();}ctx.shadowBlur=0;
+    } else if(name.includes('foot')){
+      ctx.fillStyle=gold;ctx.fillRect(-w*.42,-h*.28,w*.84,h*.48);
+    } else if(isArm){
+      ctx.strokeStyle='rgba(255,255,255,.12)';ctx.beginPath();ctx.moveTo(-w*.3,-h*.2);ctx.lineTo(w*.25,h*.2);ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+function drawThanoses(){
+  const order=['thighL','calfL','footL','upperArmL','forearmL','pelvis','torso','thighR','calfR','footR','upperArmR','forearmR','head'];
+  for(const a of thanoses) for(const n of order) drawThanosPart(a.parts[n],n);
+}
 function drawMissile(body){
   ctx.save();ctx.translate(body.position.x,body.position.y);ctx.rotate(Math.atan2(body.velocity.y,body.velocity.x));
   ctx.fillStyle='#b9c7cc';ctx.beginPath();ctx.moveTo(10,0);ctx.lineTo(-7,-5);ctx.lineTo(-7,5);ctx.closePath();ctx.fill();
@@ -1059,6 +1170,7 @@ function draw(){
   for(const b of bodies) drawWorldBody(b);
   for(const b of bodies) if(b.plugin?.kind==='dummy') drawDummyPart(b);
   drawTony();
+  drawThanoses();
   for(const m of missiles) if(Composite.get(world,m.body.id,'body')) drawMissile(m.body);
   if(tony.shieldBody) drawShield(tony.shieldBody);
   drawEffects();
@@ -1066,10 +1178,22 @@ function draw(){
   updateHUD();
 }
 function updateHUD(){
-  const hp=Math.round(tony.health), nano=Math.round(tony.nano), power=Math.round(tony.energy);
-  ui.healthText.textContent=hp;ui.nanoText.textContent=nano;ui.energyText.textContent=power;
-  ui.healthBar.style.width=hp+'%';ui.nanoBar.style.width=nano+'%';ui.energyBar.style.width=power+'%';
-  ui.suitState.textContent=tony.coverage<.05?'TONY / CIVILIAN':tony.coverage>.96?'MARK 50 / ONLINE':'NANOTECH / '+Math.round(tony.coverage*100)+'%';
+  const a=selectedActor||tony;
+  if(a.type==='thanos'){
+    const hp=Math.round(a.health);
+    ui.selectedName.textContent='THANOS';
+    ui.healthLabel.textContent='HEALTH';ui.nanoLabel.textContent='DURABILITY';ui.energyLabel.textContent='GAUNTLET';
+    ui.healthText.textContent=hp;ui.nanoText.textContent=hp;ui.energyText.textContent='6';
+    ui.healthBar.style.width=hp+'%';ui.nanoBar.style.width=hp+'%';ui.energyBar.style.width='100%';
+    ui.suitState.textContent='INFINITY WAR';
+  }else{
+    const hp=Math.round(tony.health), nano=Math.round(tony.nano), power=Math.round(tony.energy);
+    ui.selectedName.textContent='TONY STARK';
+    ui.healthLabel.textContent='HEALTH';ui.nanoLabel.textContent='NANO RESERVE';ui.energyLabel.textContent='POWER';
+    ui.healthText.textContent=hp;ui.nanoText.textContent=nano;ui.energyText.textContent=power;
+    ui.healthBar.style.width=hp+'%';ui.nanoBar.style.width=nano+'%';ui.energyBar.style.width=power+'%';
+    ui.suitState.textContent=tony.coverage<.05?'CIVILIAN':tony.coverage>.96?'MARK 50':'NANOTECH '+Math.round(tony.coverage*100)+'%';
+  }
   ui.weaponState.textContent=weaponNames[weaponMode];
 }
 function updateWeaponUI(){
@@ -1100,15 +1224,17 @@ canvas.addEventListener('pointerdown',ev=>{
   canvas.setPointerCapture(ev.pointerId);
   const sp=pointerPos(ev),wp=screenToWorld(sp.x,sp.y);
   aimWorld=wp;
-  if(ev.button===2){panning=true;panStart={sx:sp.x,sy:sp.y,cx:camera.x,cy:camera.y};return;}
   const hits=Query.point(Composite.allBodies(world),wp).filter(b=>!b.isStatic&&b.plugin?.kind!=='missile');
   const target=hits[hits.length-1];
-  if(target){
+  if(target && ev.button===0){
+    if(target.plugin?.actor) selectedActor=target.plugin.actor;
+    else if(target.plugin?.kind==='tony') selectedActor=tony;
     const local=rotate({x:wp.x-target.position.x,y:wp.y-target.position.y},-target.angle);
     dragConstraint=Constraint.create({pointA:{x:wp.x,y:wp.y},bodyB:target,pointB:local,length:0,stiffness:.22,damping:.16});
     Composite.add(world,dragConstraint);dragPointerId=ev.pointerId;
-  } else if(ev.pointerType==='mouse'){
-    input.fire=true;
+    canvas.classList.remove('panning');
+  }else{
+    panning=true;panStart={sx:sp.x,sy:sp.y,cx:camera.x,cy:camera.y};canvas.classList.add('panning');
   }
 });
 canvas.addEventListener('pointermove',ev=>{
@@ -1123,16 +1249,20 @@ canvas.addEventListener('pointermove',ev=>{
 function endPointer(ev){
   input.fire=false;
   if(dragConstraint&&dragPointerId===ev.pointerId){Composite.remove(world,dragConstraint);dragConstraint=null;dragPointerId=null;}
-  panning=false;panStart=null;
+  panning=false;panStart=null;canvas.classList.remove('panning');
 }
 canvas.addEventListener('pointerup',endPointer);canvas.addEventListener('pointercancel',endPointer);
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
-canvas.addEventListener('wheel',ev=>{
-  ev.preventDefault();
-  camera.targetZoom=clamp(camera.targetZoom*Math.exp(-ev.deltaY*.001),.5,1.5);
-},{passive:false});
+canvas.addEventListener('wheel',ev=>{ev.preventDefault();},{passive:false});
+document.addEventListener('selectstart',e=>e.preventDefault());
+document.addEventListener('dragstart',e=>e.preventDefault());
+document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
+for(const name of ['gesturestart','gesturechange','gestureend']){
+  document.addEventListener(name,e=>e.preventDefault(),{passive:false});
+}
 
 addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey) && ['Equal','Minus','Digit0','NumpadAdd','NumpadSubtract'].includes(e.code)){e.preventDefault();return;}
   if(e.repeat && ['KeyE','KeyF','KeyQ','KeyP','KeyT','KeyR'].includes(e.code)) return;
   if(e.code==='KeyA')input.left=true;
   if(e.code==='KeyD')input.right=true;
@@ -1159,6 +1289,7 @@ document.querySelectorAll('[data-spawn]').forEach(btn=>btn.addEventListener('cli
   const p={x:camera.x+rand(-60,60),y:camera.y-120};
   const k=btn.dataset.spawn;
   if(k==='dummy')createDummy(p.x,p.y);
+  if(k==='thanos'){const a=createThanos(p.x,p.y-70);selectedActor=a;}
   if(k==='crate')spawnCrate(p.x,p.y);
   if(k==='concrete')spawnConcrete(p.x,p.y);
   if(k==='barrel')spawnBarrel(p.x,p.y);
