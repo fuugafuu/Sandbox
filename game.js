@@ -1027,19 +1027,21 @@ function updateCamera(){
   camera.y=clamp(camera.y,120,980);
 }
 
-function physicsSubsteps(){
+function physicsSubsteps(scaledDt){
   let maxSpeed=0;
   for(const b of Composite.allBodies(world)){
     if(b.isStatic) continue;
     const speed=Math.hypot(b.velocity.x,b.velocity.y);
     if(speed>maxSpeed) maxSpeed=speed;
   }
-  return clamp(Math.ceil(maxSpeed/7),1,8);
+  const speedSteps=Math.ceil(maxSpeed/7);
+  const timeSteps=Math.ceil(scaledDt/0.0165);
+  return clamp(Math.max(speedSteps,timeSteps),1,8);
 }
 function update(dt){
   if(paused||pickerOpen) return;
   const scaled=dt*(slowMo?.28:1);
-  const steps=physicsSubsteps();
+  const steps=physicsSubsteps(scaled);
   const sub=scaled/steps;
 
   // High-speed bodies are solved in multiple smaller steps. This greatly reduces
@@ -1050,7 +1052,7 @@ function update(dt){
     updateThanoses(sub);
     updateMissiles(sub);
     updateShield(sub);
-    Engine.update(engine,Math.min(12,sub*1000));
+    Engine.update(engine,sub*1000);
   }
 
   updateDebris(scaled);
