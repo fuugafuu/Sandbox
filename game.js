@@ -748,6 +748,36 @@ function relativePoseMotor(child,parent,targetRelative,strength,damping=.09,limi
   const impulse=clamp(error*strength-relVelocity*damping,-limit,limit);
   Body.setAngularVelocity(child,child.angularVelocity+impulse);
 }
+function relativeAngle(child,parent){
+  return Math.atan2(Math.sin(child.angle-parent.angle),Math.cos(child.angle-parent.angle));
+}
+function angularLimit(child,parent,min,max,strength=.18){
+  if(!child||!parent) return;
+  const rel=relativeAngle(child,parent);
+  let correction=0;
+  if(rel<min) correction=min-rel;
+  else if(rel>max) correction=max-rel;
+  else return;
+  const relVel=child.angularVelocity-parent.angularVelocity;
+  const impulse=clamp(correction*strength-relVel*.08,-.16,.16);
+  Body.setAngularVelocity(child,child.angularVelocity+impulse);
+  Body.setAngularVelocity(parent,parent.angularVelocity-impulse*.18);
+}
+function applyHumanJointLimits(p,heavy=false){
+  const k=heavy?1.12:1;
+  angularLimit(p.head,p.torso,-.55,.55,.18*k);
+  angularLimit(p.pelvis,p.torso,-.38,.38,.20*k);
+  angularLimit(p.upperArmL,p.torso,-2.45,2.45,.11*k);
+  angularLimit(p.upperArmR,p.torso,-2.45,2.45,.11*k);
+  angularLimit(p.forearmL,p.upperArmL,-1.65,1.45,.17*k);
+  angularLimit(p.forearmR,p.upperArmR,-1.45,1.65,.17*k);
+  angularLimit(p.thighL,p.pelvis,-1.18,1.18,.18*k);
+  angularLimit(p.thighR,p.pelvis,-1.18,1.18,.18*k);
+  angularLimit(p.calfL,p.thighL,-1.35,.72,.20*k);
+  angularLimit(p.calfR,p.thighR,-.72,1.35,.20*k);
+  angularLimit(p.footL,p.calfL,-.72,.72,.20*k);
+  angularLimit(p.footR,p.calfR,-.72,.72,.20*k);
+}
 function isTonyDragged(){
   return !!(dragConstraint && dragConstraint.bodyB && dragConstraint.bodyB.plugin?.kind==='tony');
 }
@@ -767,6 +797,8 @@ function activeRagdoll(dt){
   const pelvisBelowTorso=p.pelvis.position.y>p.torso.position.y+28;
   const feetBelowPelvis=p.footL.position.y>p.pelvis.position.y+70 && p.footR.position.y>p.pelvis.position.y+70;
   const canBalance=tony.grounded && torsoUpright && pelvisBelowTorso && feetBelowPelvis && tony.stun<=0;
+
+  applyHumanJointLimits(p,false);
 
   // Muscle tone is relative to adjacent bones. Picking Tony up no longer makes
   // every limb instantly go limp, and rotating the whole ragdoll does not
@@ -875,6 +907,7 @@ function updateThanoses(dt){
     const upright=Math.abs(shortestAngle(0,p.torso.angle))<.65;
     const plausible=a.grounded&&upright&&p.pelvis.position.y>p.torso.position.y+35&&p.footL.position.y>p.pelvis.position.y+85&&p.footR.position.y>p.pelvis.position.y+85&&a.stun<=0;
     const tone=a.stun>0?.32:1;
+    applyHumanJointLimits(p,true);
 
     relativePoseMotor(p.head,p.torso,0,.18*tone,.10,.12);
     relativePoseMotor(p.pelvis,p.torso,0,.20*tone,.11,.13);
@@ -942,15 +975,19 @@ function updateCamera(){
 function update(dt){
   if(paused) return;
   const scaled=dt*(slowMo?.28:1);
-  Engine.update(engine,Math.min(33,scaled*1000));
+
+  // Controllers apply forces before the solver step so the ragdolls respond in
+  // the same frame instead of feeling delayed or rubbery.
   updateTony(scaled);
   updateMark42Pieces(scaled);
   updateThanoses(scaled);
   updateMissiles(scaled);
   updateShield(scaled);
+  Engine.update(engine,Math.min(33,scaled*1000));
+
   updateDebris(scaled);
   updateEffects(scaled);
-  updateCamera(scaled);
+  updateCamera();
 }
 
 function drawGrid(){
@@ -1407,7 +1444,7 @@ function drawEffects(){
     } else {
       ctx.globalAlpha=a;
       if(e.kind==='dust'){ctx.fillStyle='rgba(151,159,161,.26)';ctx.shadowBlur=0;}
-      else if(e.energy||e.kind==='nano'||e.kind==='thruster'||e.kind==='missileTrail'){ctx.fillStyle=e.kind==='thruster'?'#7edfff':'#a7f4ff';ctx.shadowColor=COLORS.cyan;ctx.shadowBlur=8;}
+      else if(e.energy||e.kind==='nano'||e.kind==='thruster'||e.kind==='missileTrail'||e.kind==='pieceThruster'){ctx.fillStyle=e.kind==='thruster'?'#7edfff':'#a7f4ff';ctx.shadowColor=COLORS.cyan;ctx.shadowBlur=8;}
       else {ctx.fillStyle=e.hot?'#ffb562':'#ccc';ctx.shadowColor='#ff9d58';ctx.shadowBlur=5;}
       ctx.beginPath();ctx.arc(e.x,e.y,e.size||2,0,Math.PI*2);ctx.fill();
     }
