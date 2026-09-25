@@ -596,6 +596,7 @@ function update(dt){
 }
 
 function drawGrid(){
+  ctx.setTransform(1,0,0,1,0,0);
   ctx.fillStyle=COLORS.bg;
   ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.setTransform(dpr*camera.zoom,0,0,dpr*camera.zoom,dpr*(viewW/2-camera.x*camera.zoom),dpr*(viewH/2-camera.y*camera.zoom));
