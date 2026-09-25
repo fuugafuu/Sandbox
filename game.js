@@ -359,6 +359,7 @@ function summonMark42(){
   tony.mark42Required={};
   tony.coverage=0;
   setArmorPools('mark42');
+  weaponMode=0;updateWeaponUI();
 
   for(const [part] of MARK42_LAYOUT) tony.mark42Required[part]=(tony.mark42Required[part]||0)+1;
 
@@ -1001,6 +1002,18 @@ function drawWorldBody(body){
     ctx.restore();
   } else if(kind==='platform'){
     ctx.fillStyle='#3c464c';ctx.fill();ctx.strokeStyle='#7a888f';ctx.lineWidth=1.4;ctx.stroke();
+  } else if(kind==='mark42piece'){
+    const idx=p.pieceIndex||0;
+    const isRed=idx%5===0||idx%7===0;
+    const g=ctx.createLinearGradient(body.bounds.min.x,body.bounds.min.y,body.bounds.max.x,body.bounds.max.y);
+    if(isRed){g.addColorStop(0,'#bd4a42');g.addColorStop(1,'#6d2424');}
+    else {g.addColorStop(0,'#e1c17d');g.addColorStop(.5,'#b68b42');g.addColorStop(1,'#6e4d24');}
+    ctx.fillStyle=g;ctx.fill();ctx.strokeStyle='rgba(242,213,160,.62)';ctx.lineWidth=1;ctx.stroke();
+    ctx.save();ctx.translate(body.position.x,body.position.y);ctx.rotate(body.angle);
+    const bw=body.bounds.max.x-body.bounds.min.x,bh=body.bounds.max.y-body.bounds.min.y;
+    ctx.fillStyle='#2c3133';ctx.fillRect(-bw*.08,-bh*.35,bw*.16,bh*.7);
+    ctx.fillStyle=COLORS.cyan;ctx.shadowColor=COLORS.cyan;ctx.shadowBlur=5;ctx.fillRect(-2,bh*.15,4,2);ctx.shadowBlur=0;
+    ctx.restore();
   } else if(kind==='breakable'||kind==='concrete'){
     ctx.fillStyle=COLORS.concrete;ctx.fill();ctx.strokeStyle=COLORS.concreteEdge;ctx.lineWidth=1.2;ctx.stroke();
     const ratio=(p.hp??p.maxHp)/(p.maxHp||1);drawDamageCracks(body,ratio);
@@ -1163,6 +1176,67 @@ function drawArmorDamage(name,ratio,w,h){
   }
   ctx.restore();
 }
+function drawMark42MechanicalDamage(name,ratio,w,h){
+  const damage=1-clamp(ratio,0,1);
+  if(damage<.08) return;
+  const seed=hashString('mk42-'+name);
+  ctx.save();
+
+  const scrapeCount=Math.min(6,1+Math.floor(damage*7));
+  for(let i=0;i<scrapeCount;i++){
+    const x=(stableNoise(seed,i*5)-.5)*w*.65;
+    const y=(stableNoise(seed,i*5+1)-.5)*h*.62;
+    const len=3+stableNoise(seed,i*5+2)*8;
+    ctx.save();ctx.translate(x,y);ctx.rotate((stableNoise(seed,i*5+3)-.5)*1.2);
+    ctx.strokeStyle=`rgba(45,38,29,${.22+damage*.34})`;ctx.lineWidth=1.3;
+    ctx.beginPath();ctx.moveTo(-len*.5,0);ctx.lineTo(len*.5,0);ctx.stroke();
+    ctx.strokeStyle=`rgba(245,219,172,${.14+damage*.18})`;ctx.lineWidth=.55;
+    ctx.beginPath();ctx.moveTo(-len*.4,-1);ctx.lineTo(len*.42,-1);ctx.stroke();
+    ctx.restore();
+  }
+
+  if(damage>.28){
+    const gaps=Math.min(3,1+Math.floor((damage-.28)*4));
+    for(let i=0;i<gaps;i++){
+      const cx=(stableNoise(seed,100+i*7)-.5)*w*.42;
+      const cy=(stableNoise(seed,101+i*7)-.5)*h*.44;
+      const rw=4+stableNoise(seed,102+i*7)*6;
+      const rh=3+stableNoise(seed,103+i*7)*7;
+      ctx.fillStyle='#24292b';
+      ctx.beginPath();
+      ctx.moveTo(cx-rw,cy-rh*.3);
+      ctx.lineTo(cx-rw*.35,cy-rh);
+      ctx.lineTo(cx+rw*.8,cy-rh*.5);
+      ctx.lineTo(cx+rw,cy+rh*.45);
+      ctx.lineTo(cx-rw*.2,cy+rh);
+      ctx.closePath();ctx.fill();
+      ctx.strokeStyle='rgba(180,151,102,.58)';ctx.lineWidth=.8;ctx.stroke();
+
+      ctx.save();ctx.clip();
+      ctx.strokeStyle='rgba(111,126,129,.72)';ctx.lineWidth=.8;
+      for(let k=-1;k<=1;k++){
+        ctx.beginPath();ctx.moveTo(cx-rw,cy+k*3);ctx.lineTo(cx+rw,cy+k*3+(stableNoise(seed,150+i*5+k)-.5)*4);ctx.stroke();
+      }
+      ctx.strokeStyle='rgba(83,203,226,.55)';
+      ctx.beginPath();ctx.moveTo(cx-rw*.65,cy-rh*.25);ctx.lineTo(cx+rw*.6,cy+rh*.18);ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  if(damage>.62){
+    const side=stableNoise(seed,300)>.5?1:-1;
+    ctx.fillStyle='#171b1d';
+    ctx.beginPath();
+    ctx.moveTo(side*w*.5,-h*.32);
+    ctx.lineTo(side*w*.18,-h*.18);
+    ctx.lineTo(side*w*.30,h*.02);
+    ctx.lineTo(side*w*.12,h*.20);
+    ctx.lineTo(side*w*.5,h*.35);
+    ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(176,148,96,.6)';ctx.stroke();
+  }
+  ctx.restore();
+}
 function drawMark42Armor(body,name,presence){
   if(presence<=.01 || tony.armor[name]<=.2) return;
   const ratio=clamp(tony.armor[name]/tony.armorMax[name],0,1);
@@ -1199,7 +1273,7 @@ function drawMark42Armor(body,name,presence){
     ctx.strokeStyle='rgba(35,31,26,.48)';ctx.lineWidth=.8;
     ctx.beginPath();ctx.moveTo(-w*.35,-h*.08);ctx.lineTo(w*.28,h*.10);ctx.stroke();
   }
-  drawArmorDamage('42'+name,ratio,w,h);
+  drawMark42MechanicalDamage(name,ratio,w,h);
   ctx.restore();
 }
 function drawArmor(body,name,presence){
@@ -1419,9 +1493,26 @@ function loop(ts){
 requestAnimationFrame(loop);
 
 function pointerPos(ev){const r=canvas.getBoundingClientRect();return {x:ev.clientX-r.left,y:ev.clientY-r.top};}
+const touchPointers=new Map();
+let pinchState=null;
+function beginPinchIfReady(){
+  if(touchPointers.size!==2) return false;
+  const pts=[...touchPointers.values()];
+  const dx=pts[1].x-pts[0].x,dy=pts[1].y-pts[0].y;
+  const mid={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+  pinchState={distance:Math.hypot(dx,dy)||1,zoom:camera.zoom,world:screenToWorld(mid.x,mid.y),mid};
+  if(dragConstraint){Composite.remove(world,dragConstraint);dragConstraint=null;dragPointerId=null;}
+  panning=false;panStart=null;canvas.classList.add('panning');
+  return true;
+}
 canvas.addEventListener('pointerdown',ev=>{
   canvas.setPointerCapture(ev.pointerId);
-  const sp=pointerPos(ev),wp=screenToWorld(sp.x,sp.y);
+  const sp=pointerPos(ev);
+  if(ev.pointerType==='touch'){
+    touchPointers.set(ev.pointerId,sp);
+    if(beginPinchIfReady()) return;
+  }
+  const wp=screenToWorld(sp.x,sp.y);
   aimWorld=wp;
   const hits=Query.point(Composite.allBodies(world),wp).filter(b=>!b.isStatic&&b.plugin?.kind!=='missile');
   const target=hits[hits.length-1];
@@ -1437,7 +1528,22 @@ canvas.addEventListener('pointerdown',ev=>{
   }
 });
 canvas.addEventListener('pointermove',ev=>{
-  const sp=pointerPos(ev),wp=screenToWorld(sp.x,sp.y);
+  const sp=pointerPos(ev);
+  if(ev.pointerType==='touch'&&touchPointers.has(ev.pointerId)){
+    touchPointers.set(ev.pointerId,sp);
+    if(pinchState&&touchPointers.size===2){
+      const pts=[...touchPointers.values()];
+      const dx=pts[1].x-pts[0].x,dy=pts[1].y-pts[0].y;
+      const dist=Math.hypot(dx,dy)||1;
+      const mid={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+      camera.zoom=clamp(pinchState.zoom*(dist/pinchState.distance),camera.minZoom,camera.maxZoom);
+      const nowWorld=screenToWorld(mid.x,mid.y);
+      camera.x+=pinchState.world.x-nowWorld.x;
+      camera.y+=pinchState.world.y-nowWorld.y;
+      return;
+    }
+  }
+  const wp=screenToWorld(sp.x,sp.y);
   aimWorld=wp;
   if(dragConstraint&&dragPointerId===ev.pointerId){dragConstraint.pointA.x=wp.x;dragConstraint.pointA.y=wp.y;}
   if(panning&&panStart){
@@ -1447,6 +1553,8 @@ canvas.addEventListener('pointermove',ev=>{
 });
 function endPointer(ev){
   input.fire=false;
+  if(ev.pointerType==='touch') touchPointers.delete(ev.pointerId);
+  if(touchPointers.size<2) pinchState=null;
   if(dragConstraint&&dragPointerId===ev.pointerId){Composite.remove(world,dragConstraint);dragConstraint=null;dragPointerId=null;}
   panning=false;panStart=null;canvas.classList.remove('panning');
 }
@@ -1463,6 +1571,7 @@ canvas.addEventListener('wheel',ev=>{
   camera.x+=before.x-after.x;
   camera.y+=before.y-after.y;
 },{passive:false});
+document.addEventListener('wheel',e=>{if(e.ctrlKey||e.metaKey)e.preventDefault();},{passive:false});
 document.addEventListener('selectstart',e=>e.preventDefault());
 document.addEventListener('dragstart',e=>e.preventDefault());
 document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
