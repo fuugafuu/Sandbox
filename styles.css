@@ -1,0 +1,63 @@
+:root {
+  color-scheme: dark;
+  --bg:#070b10;
+  --panel:rgba(11,18,25,.82);
+  --line:rgba(132,190,218,.18);
+  --text:#d9edf7;
+  --muted:#7694a3;
+  --cyan:#7ee8ff;
+  --red:#b62d2d;
+  --gold:#d9a94f;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body,#app{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}
+button{font:inherit;color:inherit}
+#game{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair}
+.glass{background:linear-gradient(180deg,rgba(18,29,39,.9),rgba(8,13,19,.82));border:1px solid var(--line);box-shadow:0 12px 42px rgba(0,0,0,.3),inset 0 1px rgba(255,255,255,.03);backdrop-filter:blur(14px)}
+#hud{position:absolute;top:max(12px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);height:62px;min-width:min(980px,calc(100vw - 190px));display:flex;align-items:center;gap:17px;border-radius:14px;padding:8px 14px;pointer-events:none}
+.brand{display:grid;grid-template-columns:16px auto;grid-template-rows:1fr 1fr;align-items:center;column-gap:7px;min-width:144px}
+.brand .arc-dot{grid-row:1/3;width:13px;height:13px;border-radius:50%;background:#baf5ff;box-shadow:0 0 16px #7ee8ff}
+.brand strong{font-size:13px;letter-spacing:.18em;line-height:1}
+.brand small{color:var(--muted);font-size:8px;letter-spacing:.24em}
+.meter-group{width:116px}
+.meter-group label{display:flex;justify-content:space-between;color:#92afbd;font-size:8px;letter-spacing:.13em;margin-bottom:5px}
+.meter{height:5px;background:#15222c;border-radius:10px;overflow:hidden}
+.meter i{display:block;width:100%;height:100%;background:linear-gradient(90deg,#9ad8b8,#dbeadb);box-shadow:0 0 10px rgba(170,250,215,.3)}
+.meter.nano i{background:linear-gradient(90deg,#80dff5,#d4fbff)}
+.meter.power i{background:linear-gradient(90deg,#d09f46,#ffe09a)}
+.status-pill{padding:8px 10px;border:1px solid rgba(130,197,224,.14);border-radius:9px;color:#9bb5c2;font-size:9px;letter-spacing:.12em;white-space:nowrap}
+.status-pill.weapon{color:#dcecf3}
+#inventory{position:absolute;left:12px;top:86px;width:152px;border-radius:15px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.panel-title{padding:3px 7px 8px;color:#6f8c9a;font-size:9px;letter-spacing:.2em}
+#inventory button{border:1px solid transparent;background:rgba(255,255,255,.025);border-radius:10px;height:38px;display:flex;align-items:center;gap:9px;padding:0 9px;text-align:left;cursor:pointer;font-size:11px}
+#inventory button:hover{border-color:rgba(126,232,255,.2);background:rgba(126,232,255,.055)}
+#inventory button b{display:grid;place-items:center;width:21px;height:21px;border-radius:6px;background:#111c25;color:#95dff0;font-size:11px}
+#inventory hr{width:100%;border:0;border-top:1px solid var(--line);margin:4px 0}
+#weaponDock{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:5px;padding:6px;border-radius:13px}
+#weaponDock button{height:38px;border:1px solid transparent;background:transparent;border-radius:9px;color:#8199a5;padding:0 10px;font-size:10px;cursor:pointer}
+#weaponDock button span{display:inline-grid;place-items:center;width:18px;height:18px;border:1px solid rgba(255,255,255,.09);border-radius:5px;margin-right:5px;color:#63808e}
+#weaponDock button.active{background:rgba(118,217,242,.09);border-color:rgba(118,217,242,.22);color:#d8f7ff}
+#hint{position:absolute;right:12px;top:86px;border-radius:10px;padding:9px 11px;color:#698693;font-size:9px;letter-spacing:.05em}
+#toast{position:absolute;top:160px;left:50%;transform:translate(-50%,-8px);padding:10px 16px;border-radius:999px;background:rgba(4,8,12,.78);border:1px solid rgba(137,222,245,.2);font-size:10px;letter-spacing:.12em;opacity:0;transition:.2s;pointer-events:none}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#mobileControls{display:none;position:absolute;inset:auto 0 max(9px,env(safe-area-inset-bottom));padding:0 11px;pointer-events:none;justify-content:space-between;align-items:end}
+#mobileControls>div{display:flex;gap:7px;pointer-events:auto}
+#mobileControls button{width:52px;height:52px;border-radius:15px;border:1px solid rgba(150,221,242,.2);background:rgba(10,18,25,.82);backdrop-filter:blur(12px);font-size:11px;font-weight:700;touch-action:none}
+#mobileControls .mobile-mid{flex-direction:column}
+#mobileControls .mobile-mid button{height:36px;width:64px;border-radius:11px;font-size:9px}
+#mobileControls .fire{width:65px;height:65px;border-radius:50%;border-color:rgba(241,103,89,.35);background:rgba(116,26,25,.6)}
+@media(max-width:900px){
+  #hud{left:8px;right:8px;transform:none;min-width:0;width:auto;height:56px;gap:9px;overflow:hidden}
+  .brand{min-width:100px}
+  .meter-group{width:80px}
+  #inventory{top:75px;width:54px;padding:6px}
+  #inventory .panel-title,#inventory button span{display:none}
+  #inventory button{justify-content:center;padding:0}
+  #inventory button b{width:28px;height:28px}
+  #hint,#weaponDock{display:none}
+}
+@media(pointer:coarse),(max-width:760px){
+  #mobileControls{display:flex}
+  #inventory{max-height:48vh;overflow:auto}
+  #hud .status-pill{display:none}
+}
