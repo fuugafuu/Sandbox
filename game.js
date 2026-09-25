@@ -119,18 +119,25 @@ function createBoundary(){
 }
 function createEnvironment(){
   createBoundary();
-  const tileW=160;
-  for(let x=80;x<W;x+=tileW){
-    createBreakableTile(x,FLOOR_Y,tileW-2,58,320);
-    if(x>1800 && x<2450 && ((x/160)|0)%2===0){
-      createBreakableTile(x,FLOOR_Y-145,110,230,240);
-    }
+
+  // The main floor is permanent. Weapons/explosions can scar movable props and
+  // breakable structures, but the playfield itself must never disappear.
+  const ground = Bodies.rectangle(W/2,FLOOR_Y,W+240,70,{
+    isStatic:true,friction:1,restitution:.02
+  });
+  tag(ground,{kind:'ground',invulnerable:true});
+  Composite.add(world,ground);
+
+  // Breakable test structures remain separate from the permanent ground.
+  for(let y=FLOOR_Y-78;y>FLOOR_Y-430;y-=78){
+    createBreakableTile(1540,y,76,74,185);
   }
-  for(let y=FLOOR_Y-85;y>FLOOR_Y-430;y-=85){
-    createBreakableTile(1540,y,80,82,180);
+  for(let y=FLOOR_Y-78;y>FLOOR_Y-310;y-=78){
+    createBreakableTile(2210,y,76,74,185);
   }
-  const platform = Bodies.rectangle(760,700,440,24,{isStatic:true,friction:.8});
-  tag(platform,{kind:'steel',hp:1200,maxHp:1200});
+
+  const platform = Bodies.rectangle(760,700,440,24,{isStatic:true,friction:1,restitution:.02});
+  tag(platform,{kind:'platform',invulnerable:true});
   Composite.add(world,platform);
 }
 function spawnCrate(x,y){
@@ -198,7 +205,7 @@ function createTony(x,y){
   const actor={
     type:'tony', health:100, nano:100, energy:100, coverage:0, suitWanted:false,
     flight:false, alive:true, facing:1, fireCooldown:0, jumpCooldown:0, shieldBody:null,
-    weaponMorph:0, armor:{}, armorMax:{}, bodyHp:{}, parts:{}, bodies:[], joints:[]
+    weaponMorph:0, stun:0, grounded:false, armor:{}, armorMax:{}, bodyHp:{}, parts:{}, bodies:[], joints:[]
   };
   const add=(name,body,maxHp,armorMax)=>{
     tag(body,{kind:'tony',partName:name,actor});
@@ -217,23 +224,23 @@ function createTony(x,y){
   const thighR=add('thighR',Bodies.rectangle(x+15,y+65,22,72,{...opts,chamfer:{radius:8}}),110,110);
   const calfL=add('calfL',Bodies.rectangle(x-15,y+126,20,66,{...opts,chamfer:{radius:7}}),95,100);
   const calfR=add('calfR',Bodies.rectangle(x+15,y+126,20,66,{...opts,chamfer:{radius:7}}),95,100);
-  const footL=add('footL',Bodies.rectangle(x-19,y+166,36,15,{...opts,chamfer:{radius:5}}),65,70);
-  const footR=add('footR',Bodies.rectangle(x+19,y+166,36,15,{...opts,chamfer:{radius:5}}),65,70);
+  const footL=add('footL',Bodies.rectangle(x-19,y+166,36,15,{...opts,chamfer:{radius:5},friction:1.15}),65,70);
+  const footR=add('footR',Bodies.rectangle(x+19,y+166,36,15,{...opts,chamfer:{radius:5},friction:1.15}),65,70);
 
   const c=(a,pa,b,pb,l,s=.72)=>Constraint.create({bodyA:a,pointA:pa,bodyB:b,pointB:pb,length:l,stiffness:s,damping:.11});
   actor.joints=[
-    c(head,{x:0,y:21},torso,{x:0,y:-38},5,.74),
-    c(torso,{x:0,y:38},pelvis,{x:0,y:-14},4,.78),
-    c(torso,{x:-27,y:-27},upperArmL,{x:0,y:-27},4,.68),
-    c(torso,{x:27,y:-27},upperArmR,{x:0,y:-27},4,.68),
-    c(upperArmL,{x:0,y:27},forearmL,{x:0,y:-25},4,.61),
-    c(upperArmR,{x:0,y:27},forearmR,{x:0,y:-25},4,.61),
-    c(pelvis,{x:-14,y:13},thighL,{x:0,y:-32},4,.72),
-    c(pelvis,{x:14,y:13},thighR,{x:0,y:-32},4,.72),
-    c(thighL,{x:0,y:32},calfL,{x:0,y:-29},4,.66),
-    c(thighR,{x:0,y:32},calfR,{x:0,y:-29},4,.66),
-    c(calfL,{x:0,y:29},footL,{x:8,y:-2},3,.68),
-    c(calfR,{x:0,y:29},footR,{x:-8,y:-2},3,.68)
+    c(head,{x:0,y:21},torso,{x:0,y:-38},5,.82),
+    c(torso,{x:0,y:38},pelvis,{x:0,y:-14},4,.90),
+    c(torso,{x:-27,y:-27},upperArmL,{x:0,y:-27},4,.72),
+    c(torso,{x:27,y:-27},upperArmR,{x:0,y:-27},4,.72),
+    c(upperArmL,{x:0,y:27},forearmL,{x:0,y:-25},4,.66),
+    c(upperArmR,{x:0,y:27},forearmR,{x:0,y:-25},4,.66),
+    c(pelvis,{x:-14,y:13},thighL,{x:0,y:-32},4,.88),
+    c(pelvis,{x:14,y:13},thighR,{x:0,y:-32},4,.88),
+    c(thighL,{x:0,y:32},calfL,{x:0,y:-29},4,.84),
+    c(thighR,{x:0,y:32},calfR,{x:0,y:-29},4,.84),
+    c(calfL,{x:0,y:29},footL,{x:8,y:-2},3,.82),
+    c(calfR,{x:0,y:29},footR,{x:-8,y:-2},3,.82)
   ];
   Composite.add(world,[...actor.bodies,...actor.joints]);
   return actor;
@@ -267,7 +274,7 @@ function resetScene(){
   spawnConcrete(1350,600); spawnBarrel(1440,580);
   spawnSteel(1710,610);
   createDummy(1950,650);
-  tony=createTony(980,610);
+  tony=createTony(980,690);
   camera.x=1000; camera.y=540;
   weaponMode=0; updateWeaponUI();
   toast('LAB RESET');
@@ -288,6 +295,7 @@ function recalcTonyHealth(){
 function damageBody(body,amount,point,source='impact'){
   if(!body || amount<=0) return;
   const p=body.plugin||{};
+  if(p.invulnerable || p.kind==='ground' || p.kind==='platform' || p.kind==='boundary') return;
   if(p.kind==='tony'){
     const name=p.partName;
     let rem=amount;
@@ -378,6 +386,9 @@ Events.on(engine,'collisionStart',ev=>{
     const dmg=Math.pow(speed-4.7,1.32)*(.65+mass*.045);
     const pt=pair.collision?.supports?.[0]||{x:(a.position.x+b.position.x)/2,y:(a.position.y+b.position.y)/2};
     damageBody(a,dmg,pt); damageBody(b,dmg,pt);
+    if(a.plugin?.kind==='tony' || b.plugin?.kind==='tony'){
+      tony.stun=Math.max(tony.stun,clamp((dmg-3)*.035,.06,1.15));
+    }
   }
 });
 
@@ -490,6 +501,75 @@ function repairArmor(dt){
   if(repaired && Math.random()<.12) spark(tony.parts.torso.position,1,true);
 }
 
+function shortestAngle(target,current){
+  return Math.atan2(Math.sin(target-current),Math.cos(target-current));
+}
+function poseMotor(body,target,strength,damping=.09,limit=.20){
+  if(!body || strength<=0) return;
+  const error=shortestAngle(target,body.angle);
+  const impulse=clamp(error*strength-body.angularVelocity*damping,-limit,limit);
+  Body.setAngularVelocity(body,body.angularVelocity+impulse);
+}
+function isTonyDragged(){
+  return !!(dragConstraint && dragConstraint.bodyB && dragConstraint.bodyB.plugin?.kind==='tony');
+}
+function checkTonyGrounded(){
+  const supports=Composite.allBodies(world).filter(b=>b.isStatic && (b.plugin?.kind==='ground'||b.plugin?.kind==='platform'));
+  const feet=[tony.parts.footL,tony.parts.footR];
+  return feet.some(foot=>Query.collides(foot,supports).length>0 || foot.bounds.max.y>FLOOR_Y-38);
+}
+function activeRagdoll(dt){
+  const p=tony.parts;
+  tony.stun=Math.max(0,tony.stun-dt);
+  tony.grounded=checkTonyGrounded();
+  if(!tony.alive || tony.flight) return;
+
+  const moving=(input.right?1:0)-(input.left?1:0);
+  const grabbed=isTonyDragged();
+  const impactScale=tony.stun>0?.12:1;
+  const gripScale=grabbed?.05:1;
+  const airScale=tony.grounded?1:.28;
+  const k=impactScale*gripScale*airScale;
+  if(k<=.01) return;
+
+  const lean=moving*.075;
+  poseMotor(p.torso,lean,.20*k,.10,.18*k+.015);
+  poseMotor(p.pelvis,lean*.35,.22*k,.11,.18*k+.015);
+  poseMotor(p.head,lean*.20,.17*k,.10,.14*k+.01);
+
+  // Legs behave like active muscles while standing, not locked animation.
+  poseMotor(p.thighL,-moving*.025,.17*k,.09,.15*k+.01);
+  poseMotor(p.thighR,moving*.025,.17*k,.09,.15*k+.01);
+  poseMotor(p.calfL,0,.19*k,.10,.16*k+.01);
+  poseMotor(p.calfR,0,.19*k,.10,.16*k+.01);
+  poseMotor(p.footL,0,.23*k,.12,.17*k+.01);
+  poseMotor(p.footR,0,.23*k,.12,.17*k+.01);
+
+  // Arms settle naturally at the sides; a hit can still overpower these motors.
+  poseMotor(p.upperArmL,.04,.08*k,.06,.08*k+.006);
+  poseMotor(p.upperArmR,-.04,.08*k,.06,.08*k+.006);
+  poseMotor(p.forearmL,.02,.07*k,.06,.07*k+.006);
+  poseMotor(p.forearmR,-.02,.07*k,.06,.07*k+.006);
+
+  if(tony.grounded && k>.18){
+    const center=(p.footL.position.x+p.footR.position.x)*.5;
+    const balance=clamp(center-p.pelvis.position.x,-28,28);
+    const g=engine.gravity.scale*engine.gravity.y;
+    Body.applyForce(p.torso,p.torso.position,{
+      x:balance*.000012*finiteMass(p.torso),
+      y:-g*finiteMass(p.torso)*.16
+    });
+    Body.applyForce(p.pelvis,p.pelvis.position,{
+      x:balance*.000009*finiteMass(p.pelvis),
+      y:-g*finiteMass(p.pelvis)*.10
+    });
+
+    const leftTarget=p.pelvis.position.x-15;
+    const rightTarget=p.pelvis.position.x+15;
+    Body.applyForce(p.footL,p.footL.position,{x:clamp(leftTarget-p.footL.position.x,-18,18)*.000012*finiteMass(p.footL),y:0});
+    Body.applyForce(p.footR,p.footR.position,{x:clamp(rightTarget-p.footR.position.x,-18,18)*.000012*finiteMass(p.footR),y:0});
+  }
+}
 function updateTony(dt){
   const torso=tony.parts.torso;
   if(tony.suitWanted) tony.coverage=Math.min(1,tony.coverage+dt*1.28);
@@ -501,14 +581,22 @@ function updateTony(dt){
     effects.push({kind:'nano',x:b.position.x+rand(-18,18),y:b.position.y+rand(-22,22),vx:rand(-1,1),vy:rand(-1,1),life:.25,maxLife:.25,size:rand(1,3)});
   }
 
-  if(input.left){ tony.facing=-1; Body.applyForce(torso,torso.position,{x:-.0016*finiteMass(torso),y:0}); }
-  if(input.right){ tony.facing=1; Body.applyForce(torso,torso.position,{x:.0016*finiteMass(torso),y:0}); }
+  activeRagdoll(dt);
+
+  const move=(input.right?1:0)-(input.left?1:0);
+  if(move){
+    tony.facing=move;
+    const drive=.00058*finiteMass(torso);
+    Body.applyForce(torso,torso.position,{x:move*drive,y:0});
+    Body.applyForce(tony.parts.pelvis,tony.parts.pelvis.position,{x:move*drive*.72,y:0});
+  }
 
   tony.jumpCooldown=Math.max(0,tony.jumpCooldown-dt);
-  if(input.up && !tony.flight && tony.jumpCooldown<=0){
-    Body.applyForce(torso,torso.position,{x:0,y:-.0078*finiteMass(torso)});
-    Body.applyForce(tony.parts.pelvis,tony.parts.pelvis.position,{x:0,y:-.0042*finiteMass(tony.parts.pelvis)});
-    tony.jumpCooldown=.45;
+  if(input.up && !tony.flight && tony.grounded && tony.jumpCooldown<=0 && tony.stun<=0){
+    Body.applyForce(torso,torso.position,{x:0,y:-.0061*finiteMass(torso)});
+    Body.applyForce(tony.parts.pelvis,tony.parts.pelvis.position,{x:0,y:-.0045*finiteMass(tony.parts.pelvis)});
+    tony.jumpCooldown=.48;
+    tony.grounded=false;
   }
 
   if(tony.flight && tony.coverage>.75 && tony.energy>0){
@@ -521,8 +609,8 @@ function updateTony(dt){
       Body.applyForce(torso,torso.position,{x,y:0});
     }
     tony.energy=Math.max(0,tony.energy-dt*(input.up?7:3));
-    const desired=0,err=desired-torso.angle;
-    Body.setAngularVelocity(torso,torso.angularVelocity+err*.018-torso.angularVelocity*.06);
+    poseMotor(torso,0,.08,.05,.10);
+    poseMotor(tony.parts.pelvis,0,.07,.05,.09);
     if(Math.random()<.8){
       for(const footName of ['footL','footR']){
         const foot=tony.parts[footName];
@@ -636,7 +724,15 @@ function drawWorldBody(body){
   const p=body.plugin||{},kind=p.kind;
   if(kind==='boundary'||kind==='tony'||kind==='dummy'||kind==='missile'||kind==='shield') return;
   pathBody(body);
-  if(kind==='breakable'||kind==='concrete'){
+  if(kind==='ground'){
+    ctx.fillStyle='#2b3136';ctx.fill();
+    ctx.strokeStyle='#59636a';ctx.lineWidth=2;ctx.stroke();
+    ctx.save();ctx.translate(body.position.x,body.position.y);ctx.rotate(body.angle);
+    ctx.fillStyle='rgba(255,255,255,.07)';ctx.fillRect(-W/2-120,-35,W+240,5);
+    ctx.restore();
+  } else if(kind==='platform'){
+    ctx.fillStyle='#3c464c';ctx.fill();ctx.strokeStyle='#7a888f';ctx.lineWidth=1.4;ctx.stroke();
+  } else if(kind==='breakable'||kind==='concrete'){
     ctx.fillStyle=COLORS.concrete;ctx.fill();ctx.strokeStyle=COLORS.concreteEdge;ctx.lineWidth=1.2;ctx.stroke();
     const ratio=(p.hp??p.maxHp)/(p.maxHp||1);drawDamageCracks(body,ratio);
   } else if(kind==='crate'){
