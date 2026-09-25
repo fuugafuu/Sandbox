@@ -25,15 +25,18 @@ const ui = {
   toast: document.getElementById('toast')
 };
 
-const engine = Engine.create({ enableSleeping: true });
-engine.gravity.y = 1.05;
+const engine = Engine.create({ enableSleeping: false });
+engine.gravity.y = 1.0;
 engine.gravity.scale = 0.001;
+engine.positionIterations = 10;
+engine.velocityIterations = 8;
+engine.constraintIterations = 6;
 
 const world = engine.world;
 const W = 3200;
 const FLOOR_Y = 900;
 const input = { left:false, right:false, up:false, down:false, fire:false };
-const camera = { x: 1550, y: 545, zoom: 1 };
+const camera = { x: 1550, y: 545, zoom: 1, minZoom:.48, maxZoom:1.85 };
 let viewW = innerWidth, viewH = innerHeight, dpr = Math.min(devicePixelRatio || 1, 2);
 let paused = false, slowMo = false, now = 0, last = performance.now();
 let dragConstraint = null, dragPointerId = null, panning = false, panStart = null;
@@ -110,7 +113,7 @@ function resize(){
   canvas.height = Math.floor(viewH*dpr);
   canvas.style.width = viewW+'px';
   canvas.style.height = viewH+'px';
-  camera.zoom = 1;
+  camera.zoom = clamp(camera.zoom,camera.minZoom,camera.maxZoom);
 }
 addEventListener('resize', resize);
 resize();
@@ -616,6 +619,14 @@ function poseMotor(body,target,strength,damping=.09,limit=.20){
   const impulse=clamp(error*strength-body.angularVelocity*damping,-limit,limit);
   Body.setAngularVelocity(body,body.angularVelocity+impulse);
 }
+function relativePoseMotor(child,parent,targetRelative,strength,damping=.09,limit=.18){
+  if(!child||!parent||strength<=0) return;
+  const target=parent.angle+targetRelative;
+  const relVelocity=child.angularVelocity-parent.angularVelocity;
+  const error=shortestAngle(target,child.angle);
+  const impulse=clamp(error*strength-relVelocity*damping,-limit,limit);
+  Body.setAngularVelocity(child,child.angularVelocity+impulse);
+}
 function isTonyDragged(){
   return !!(dragConstraint && dragConstraint.bodyB && dragConstraint.bodyB.plugin?.kind==='tony');
 }
@@ -631,50 +642,45 @@ function activeRagdoll(dt){
   if(!tony.alive || tony.flight) return;
 
   const moving=(input.right?1:0)-(input.left?1:0);
-  const grabbed=isTonyDragged();
-  const impactScale=tony.stun>0?.12:1;
-  const gripScale=grabbed?.05:1;
-  const airScale=tony.grounded?1:.28;
-  const k=impactScale*gripScale*airScale;
-  if(k<=.01) return;
+  const torsoUpright=Math.abs(shortestAngle(0,p.torso.angle))<.62;
+  const pelvisBelowTorso=p.pelvis.position.y>p.torso.position.y+28;
+  const feetBelowPelvis=p.footL.position.y>p.pelvis.position.y+70 && p.footR.position.y>p.pelvis.position.y+70;
+  const canBalance=tony.grounded && torsoUpright && pelvisBelowTorso && feetBelowPelvis && tony.stun<=0;
 
-  const lean=moving*.075;
-  poseMotor(p.torso,lean,.20*k,.10,.18*k+.015);
-  poseMotor(p.pelvis,lean*.35,.22*k,.11,.18*k+.015);
-  poseMotor(p.head,lean*.20,.17*k,.10,.14*k+.01);
+  // Muscle tone is relative to adjacent bones. Picking Tony up no longer makes
+  // every limb instantly go limp, and rotating the whole ragdoll does not
+  // magically rotate him back upright in mid-air.
+  const tone=tony.stun>0?.22:1;
+  relativePoseMotor(p.head,p.torso,0,.16*tone,.09,.11);
+  relativePoseMotor(p.pelvis,p.torso,0,.18*tone,.10,.12);
+  relativePoseMotor(p.upperArmL,p.torso,.05,.09*tone,.07,.08);
+  relativePoseMotor(p.upperArmR,p.torso,-.05,.09*tone,.07,.08);
+  relativePoseMotor(p.forearmL,p.upperArmL,0,.08*tone,.07,.075);
+  relativePoseMotor(p.forearmR,p.upperArmR,0,.08*tone,.07,.075);
+  relativePoseMotor(p.thighL,p.pelvis,-moving*.025,.14*tone,.09,.11);
+  relativePoseMotor(p.thighR,p.pelvis,moving*.025,.14*tone,.09,.11);
+  relativePoseMotor(p.calfL,p.thighL,0,.15*tone,.09,.12);
+  relativePoseMotor(p.calfR,p.thighR,0,.15*tone,.09,.12);
+  relativePoseMotor(p.footL,p.calfL,0,.16*tone,.10,.12);
+  relativePoseMotor(p.footR,p.calfR,0,.16*tone,.10,.12);
 
-  // Legs behave like active muscles while standing, not locked animation.
-  poseMotor(p.thighL,-moving*.025,.17*k,.09,.15*k+.01);
-  poseMotor(p.thighR,moving*.025,.17*k,.09,.15*k+.01);
-  poseMotor(p.calfL,0,.19*k,.10,.16*k+.01);
-  poseMotor(p.calfR,0,.19*k,.10,.16*k+.01);
-  poseMotor(p.footL,0,.23*k,.12,.17*k+.01);
-  poseMotor(p.footR,0,.23*k,.12,.17*k+.01);
+  // World-up balance only exists while he is already in a physically plausible
+  // standing posture. Once knocked flat, there is no invisible self-righting force.
+  if(!canBalance) return;
 
-  // Arms settle naturally at the sides; a hit can still overpower these motors.
-  poseMotor(p.upperArmL,.04,.08*k,.06,.08*k+.006);
-  poseMotor(p.upperArmR,-.04,.08*k,.06,.08*k+.006);
-  poseMotor(p.forearmL,.02,.07*k,.06,.07*k+.006);
-  poseMotor(p.forearmR,-.02,.07*k,.06,.07*k+.006);
-
-  if(tony.grounded && k>.18){
-    const center=(p.footL.position.x+p.footR.position.x)*.5;
-    const balance=clamp(center-p.pelvis.position.x,-28,28);
-    const g=engine.gravity.scale*engine.gravity.y;
-    Body.applyForce(p.torso,p.torso.position,{
-      x:balance*.000012*finiteMass(p.torso),
-      y:-g*finiteMass(p.torso)*.16
-    });
-    Body.applyForce(p.pelvis,p.pelvis.position,{
-      x:balance*.000009*finiteMass(p.pelvis),
-      y:-g*finiteMass(p.pelvis)*.10
-    });
-
-    const leftTarget=p.pelvis.position.x-15;
-    const rightTarget=p.pelvis.position.x+15;
-    Body.applyForce(p.footL,p.footL.position,{x:clamp(leftTarget-p.footL.position.x,-18,18)*.000012*finiteMass(p.footL),y:0});
-    Body.applyForce(p.footR,p.footR.position,{x:clamp(rightTarget-p.footR.position.x,-18,18)*.000012*finiteMass(p.footR),y:0});
-  }
+  const lean=moving*.065;
+  poseMotor(p.torso,lean,.13,.10,.11);
+  const center=(p.footL.position.x+p.footR.position.x)*.5;
+  const balance=clamp(center-p.pelvis.position.x,-24,24);
+  const g=engine.gravity.scale*engine.gravity.y;
+  Body.applyForce(p.torso,p.torso.position,{
+    x:balance*.000008*finiteMass(p.torso),
+    y:-g*finiteMass(p.torso)*.10
+  });
+  Body.applyForce(p.pelvis,p.pelvis.position,{
+    x:balance*.000006*finiteMass(p.pelvis),
+    y:-g*finiteMass(p.pelvis)*.06
+  });
 }
 function updateTony(dt){
   const torso=tony.parts.torso;
@@ -739,20 +745,28 @@ function updateThanoses(dt){
     a.stun=Math.max(0,a.stun-dt);
     const p=a.parts;
     a.grounded=[p.footL,p.footR].some(f=>Query.collides(f,supports).length>0 || f.bounds.max.y>FLOOR_Y-38);
-    const dragged=!!(dragConstraint&&dragConstraint.bodyB?.plugin?.actor===a);
-    const k=(a.stun>0?.20:1)*(dragged?.05:1)*(a.grounded?1:.28);
-    if(k>.01){
-      poseMotor(p.torso,0,.24*k,.12,.18*k+.015);poseMotor(p.pelvis,0,.25*k,.12,.18*k+.015);poseMotor(p.head,0,.19*k,.10,.14*k+.01);
-      poseMotor(p.thighL,0,.20*k,.10,.15*k+.01);poseMotor(p.thighR,0,.20*k,.10,.15*k+.01);
-      poseMotor(p.calfL,0,.22*k,.11,.16*k+.01);poseMotor(p.calfR,0,.22*k,.11,.16*k+.01);
-      poseMotor(p.footL,0,.26*k,.13,.18*k+.01);poseMotor(p.footR,0,.26*k,.13,.18*k+.01);
-      poseMotor(p.upperArmL,.08,.10*k,.07,.08*k+.006);poseMotor(p.upperArmR,-.08,.10*k,.07,.08*k+.006);
-      poseMotor(p.forearmL,.02,.09*k,.07,.08*k+.006);poseMotor(p.forearmR,-.02,.09*k,.07,.08*k+.006);
-      if(a.grounded&&k>.2){
-        const center=(p.footL.position.x+p.footR.position.x)*.5;
-        const balance=clamp(center-p.pelvis.position.x,-36,36);
-        Body.applyForce(p.torso,p.torso.position,{x:balance*.000014*finiteMass(p.torso),y:-engine.gravity.scale*engine.gravity.y*finiteMass(p.torso)*.17});
-      }
+    const upright=Math.abs(shortestAngle(0,p.torso.angle))<.65;
+    const plausible=a.grounded&&upright&&p.pelvis.position.y>p.torso.position.y+35&&p.footL.position.y>p.pelvis.position.y+85&&p.footR.position.y>p.pelvis.position.y+85&&a.stun<=0;
+    const tone=a.stun>0?.32:1;
+
+    relativePoseMotor(p.head,p.torso,0,.18*tone,.10,.12);
+    relativePoseMotor(p.pelvis,p.torso,0,.20*tone,.11,.13);
+    relativePoseMotor(p.upperArmL,p.torso,.08,.11*tone,.08,.09);
+    relativePoseMotor(p.upperArmR,p.torso,-.08,.11*tone,.08,.09);
+    relativePoseMotor(p.forearmL,p.upperArmL,0,.10*tone,.08,.09);
+    relativePoseMotor(p.forearmR,p.upperArmR,0,.10*tone,.08,.09);
+    relativePoseMotor(p.thighL,p.pelvis,0,.17*tone,.10,.12);
+    relativePoseMotor(p.thighR,p.pelvis,0,.17*tone,.10,.12);
+    relativePoseMotor(p.calfL,p.thighL,0,.18*tone,.10,.13);
+    relativePoseMotor(p.calfR,p.thighR,0,.18*tone,.10,.13);
+    relativePoseMotor(p.footL,p.calfL,0,.19*tone,.11,.13);
+    relativePoseMotor(p.footR,p.calfR,0,.19*tone,.11,.13);
+
+    if(plausible){
+      poseMotor(p.torso,0,.15,.11,.12);
+      const center=(p.footL.position.x+p.footR.position.x)*.5;
+      const balance=clamp(center-p.pelvis.position.x,-30,30);
+      Body.applyForce(p.torso,p.torso.position,{x:balance*.000009*finiteMass(p.torso),y:-engine.gravity.scale*engine.gravity.y*finiteMass(p.torso)*.11});
     }
   }
 }
@@ -791,11 +805,11 @@ function updateEffects(dt){
   }
 }
 function updateCamera(){
-  // Free sandbox camera: never follows Tony or any selected character.
-  camera.zoom=1;
-  const halfW=viewW/2;
+  // Free sandbox camera: never follows an actor. Zoom is game-space only.
+  camera.zoom=clamp(camera.zoom,camera.minZoom,camera.maxZoom);
+  const halfW=viewW/(2*camera.zoom);
   camera.x=clamp(camera.x,Math.min(halfW,W/2),Math.max(W-halfW,W/2));
-  camera.y=clamp(camera.y,200,900);
+  camera.y=clamp(camera.y,120,980);
 }
 
 function update(dt){
@@ -1253,7 +1267,17 @@ function endPointer(ev){
 }
 canvas.addEventListener('pointerup',endPointer);canvas.addEventListener('pointercancel',endPointer);
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
-canvas.addEventListener('wheel',ev=>{ev.preventDefault();},{passive:false});
+canvas.addEventListener('wheel',ev=>{
+  ev.preventDefault();
+  if(ev.ctrlKey||ev.metaKey) return;
+  const sp=pointerPos(ev);
+  const before=screenToWorld(sp.x,sp.y);
+  const next=clamp(camera.zoom*Math.exp(-ev.deltaY*.00125),camera.minZoom,camera.maxZoom);
+  camera.zoom=next;
+  const after=screenToWorld(sp.x,sp.y);
+  camera.x+=before.x-after.x;
+  camera.y+=before.y-after.y;
+},{passive:false});
 document.addEventListener('selectstart',e=>e.preventDefault());
 document.addEventListener('dragstart',e=>e.preventDefault());
 document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
