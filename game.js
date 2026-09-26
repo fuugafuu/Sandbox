@@ -868,12 +868,12 @@ function activeRagdoll(dt){
   // Strong standing balance, but only while already standing. No recovery torque
   // is applied after the body has fallen outside the standing gate above.
   Body.applyForce(p.torso,p.torso.position,{
-    x:balance*.000016*finiteMass(p.torso),
-    y:-g*finiteMass(p.torso)*.22
+    x:balance*.000014*finiteMass(p.torso),
+    y:-g*finiteMass(p.torso)*.08
   });
   Body.applyForce(p.pelvis,p.pelvis.position,{
-    x:balance*.000013*finiteMass(p.pelvis),
-    y:-g*finiteMass(p.pelvis)*.15
+    x:balance*.000011*finiteMass(p.pelvis),
+    y:-g*finiteMass(p.pelvis)*.05
   });
 
   const leftTarget=p.pelvis.position.x-17;
@@ -978,8 +978,8 @@ function updateThanoses(dt){
       const center=(p.footL.position.x+p.footR.position.x)*.5;
       const balance=clamp(center-p.pelvis.position.x,-38,38);
       const g=engine.gravity.scale*engine.gravity.y;
-      Body.applyForce(p.torso,p.torso.position,{x:balance*.000018*finiteMass(p.torso),y:-g*finiteMass(p.torso)*.23});
-      Body.applyForce(p.pelvis,p.pelvis.position,{x:balance*.000013*finiteMass(p.pelvis),y:-g*finiteMass(p.pelvis)*.14});
+      Body.applyForce(p.torso,p.torso.position,{x:balance*.000016*finiteMass(p.torso),y:-g*finiteMass(p.torso)*.09});
+      Body.applyForce(p.pelvis,p.pelvis.position,{x:balance*.000012*finiteMass(p.pelvis),y:-g*finiteMass(p.pelvis)*.055});
       Body.applyForce(p.footL,p.footL.position,{x:clamp((p.pelvis.position.x-23)-p.footL.position.x,-30,30)*.000026*finiteMass(p.footL),y:0});
       Body.applyForce(p.footR,p.footR.position,{x:clamp((p.pelvis.position.x+23)-p.footR.position.x,-30,30)*.000026*finiteMass(p.footR),y:0});
     }
@@ -1044,14 +1044,16 @@ function update(dt){
   const steps=physicsSubsteps(scaled);
   const sub=scaled/steps;
 
-  // High-speed bodies are solved in multiple smaller steps. This greatly reduces
-  // tunnelling through walls when heavy props are thrown at extreme speed.
+  // Character muscles, weapon logic and powered systems run once per rendered
+  // frame. Only the collision solver is sub-stepped. This keeps balance/strength
+  // identical whether the world is calm or a fast heavy object is moving.
+  updateTony(scaled);
+  updateMark42Pieces(scaled);
+  updateThanoses(scaled);
+  updateMissiles(scaled);
+  updateShield(scaled);
+
   for(let i=0;i<steps;i++){
-    updateTony(sub);
-    updateMark42Pieces(sub);
-    updateThanoses(sub);
-    updateMissiles(sub);
-    updateShield(sub);
     Engine.update(engine,sub*1000);
   }
 
